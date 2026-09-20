@@ -1,4 +1,11 @@
 import type { AgentWithDepartment, OfficeEvent } from "@/types";
+import { isCelebrating, markCelebrating } from "@/lib/celebration";
+import {
+  ensureAgentMeta,
+  getAgentCreatedAt,
+  getAgentLastActivity,
+  touchAgentActivity,
+} from "./agent-meta";
 
 export interface BotCrossingThread {
   id: string;
@@ -16,15 +23,24 @@ export interface BotCrossingThread {
   sizeBytes?: number;
 }
 
-const celebratingUntil = new Map<string, number>();
-
 export function markAgentCelebrating(agentId: string) {
-  celebratingUntil.set(agentId, Date.now() + 5000);
+  markCelebrating(agentId);
+  touchAgentActivity(agentId);
+}
+
+function statusFlags(agent: AgentWithDepartment) {
+  const celebrating = isCelebrating(agent.id);
+  return {
+    running: ["WORKING", "THINKING", "DELEGATING"].includes(agent.status),
+    unread: agent.status === "WAITING_APPROVAL",
+    hasError: agent.status === "FAILED",
+    prState: celebrating ? "MERGED" : null,
+  };
 }
 
 export function agentToThread(agent: AgentWithDepartment): BotCrossingThread {
-  const now = Date.now();
-  const celebrating = (celebratingUntil.get(agent.id) ?? 0) > now;
+  ensureAgentMeta(agent.id);
+  const flags = statusFlags(agent);
 
   return {
     id: agent.id,
@@ -32,35 +48,49 @@ export function agentToThread(agent: AgentWithDepartment): BotCrossingThread {
     preview: `${agent.role} · ${agent.department.name}`,
     project: agent.department.slug,
     projectPath: agent.department.slug,
-    createdAt: now,
-    lastActivityAt: now,
-    running: ["WORKING", "THINKING", "DELEGATING"].includes(agent.status),
-    unread: agent.status === "WAITING_APPROVAL",
-    hasError: agent.status === "FAILED",
-    prState: celebrating ? "MERGED" : null,
+    createdAt: getAgentCreatedAt(agent.id),
+    lastActivityAt: getAgentLastActivity(agent.id),
+    ...flags,
     archived: false,
     sizeBytes: agent.currentTask ? 50_000 : 8_000,
   };
 }
 
 export function agentsToThreads(agents: AgentWithDepartment[]): BotCrossingThread[] {
-  const now = Date.now();
   return agents
     .filter((a) => !a.isOrchestrator)
-    .map((agent) => {
-      const thread = agentToThread(agent);
-      if ((celebratingUntil.get(agent.id) ?? 0) <= now) return thread;
-      return { ...thread, prState: "MERGED", running: false };
-    });
+    .map(agentToThread);
+}
+
+export function mergeAgentIntoThread(
+  existing: BotCrossingThread | undefined,
+  agent: AgentWithDepartment
+): BotCrossingThread {
+  const base = agentToThread(agent);
+  if (!existing) return base;
+
+  return {
+    ...base,
+    createdAt: existing.createdAt ?? base.createdAt,
+    // Preserve celebration from SSE until agent poll catches up
+    prState: existing.prState === "MERGED" || base.prState === "MERGED" ? "MERGED" : null,
+    running: base.running || existing.running,
+    unread: base.unread || existing.unread,
+    hasError: base.hasError || existing.hasError,
+    lastActivityAt: Math.max(existing.lastActivityAt ?? 0, base.lastActivityAt ?? 0),
+  };
 }
 
 export function patchThreadFromEvent(
   thread: BotCrossingThread,
   event: OfficeEvent
 ): BotCrossingThread {
+  if (!event.agentId) return thread;
+  touchAgentActivity(event.agentId);
+
   const updated: BotCrossingThread = {
     ...thread,
-    lastActivityAt: Date.now(),
+    lastActivityAt: getAgentLastActivity(event.agentId),
   };
 
   switch (event.type) {

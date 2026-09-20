@@ -14,6 +14,7 @@ import {
   X,
   Brain,
   CalendarDays,
+  ScrollText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/approvals", label: "Approvals", icon: CheckCircle },
   { href: "/brain", label: "Brain", icon: Brain },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
+  { href: "/audit", label: "Audit", icon: ScrollText },
 ];
 
 export function AppShell({

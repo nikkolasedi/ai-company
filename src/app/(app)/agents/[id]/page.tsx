@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { AgentMemoryPanel } from "@/components/agents/agent-memory-panel";
 
 export default async function AgentPage({
   params,
@@ -119,24 +120,15 @@ export default async function AgentPage({
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Memory (placeholder)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {agent.memories.length === 0 ? (
-            <p className="text-sm text-zinc-500">
-              Agent memory will be populated in Phase 5
-            </p>
-          ) : (
-            agent.memories.map((m) => (
-              <p key={m.id} className="text-sm text-zinc-400">
-                {m.content}
-              </p>
-            ))
-          )}
-        </CardContent>
-      </Card>
+      <AgentMemoryPanel
+        agentId={agent.id}
+        initialMemories={agent.memories.map((m) => ({
+          id: m.id,
+          content: m.content,
+          type: m.type,
+          createdAt: m.createdAt.toISOString(),
+        }))}
+      />
     </div>
   );
 }

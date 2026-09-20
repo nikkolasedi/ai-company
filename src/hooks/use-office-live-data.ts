@@ -41,22 +41,25 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
     const eventSource = new EventSource("/api/office/events");
 
     eventSource.onmessage = (e) => {
-      const event: OfficeEvent = JSON.parse(e.data);
+      const event = JSON.parse(e.data) as OfficeEvent;
+      const agentId = event.agentId;
+      if (event.type === "CONNECTED" || !agentId) return;
+
       setEvents((prev) => [event, ...prev].slice(0, 20));
-      setHighlightedAgentId(event.agentId);
+      setHighlightedAgentId(agentId);
       setTimeout(() => setHighlightedAgentId(undefined), 3000);
 
       const newStatus = STATUS_MAP[event.type];
       if (newStatus) {
         setAgents((prev) =>
           prev.map((a) =>
-            a.id === event.agentId ? { ...a, status: newStatus } : a
+            a.id === agentId ? { ...a, status: newStatus } : a
           )
         );
       }
 
       if (event.type === "AGENT_COMPLETED") {
-        markCelebrating(event.agentId);
+        markCelebrating(agentId);
       }
 
       if (event.type === "AGENT_DELEGATED" && event.message) {
@@ -71,7 +74,7 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
               setDelegationLinks((links) =>
                 [
                   {
-                    fromAgentId: event.agentId,
+                    fromAgentId: agentId,
                     toAgentId: target.id,
                     timestamp: Date.now(),
                   },
@@ -86,13 +89,13 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
 
       if (event.type === "AGENT_TOOL_USED" && event.departmentSlug) {
         setAgents((current) => {
-          const agent = current.find((a) => a.id === event.agentId);
+          const agent = current.find((a) => a.id === agentId);
           if (!agent) return current;
           setToolPulses((pulses) =>
             [
               {
-                id: `${event.agentId}-${Date.now()}`,
-                agentId: event.agentId,
+                id: `${agentId}-${Date.now()}`,
+                agentId,
                 departmentSlug: event.departmentSlug!,
                 color: agent.department.color,
                 agentPosition: [0, 0.5, 0] as [number, number, number],

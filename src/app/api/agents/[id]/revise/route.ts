@@ -27,7 +27,18 @@ export async function POST(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  await recordLesson(id, session.user.organizationId, feedback);
+  const memory = await recordLesson(id, session.user.organizationId, feedback);
 
-  return NextResponse.json({ success: true });
+  await db.auditLog.create({
+    data: {
+      action: "AGENT_LESSON_RECORDED",
+      resource: "AgentMemory",
+      resourceId: memory.id,
+      organizationId: session.user.organizationId,
+      userId: session.user.id,
+      metadata: { agentId: id },
+    },
+  });
+
+  return NextResponse.json({ success: true, id: memory.id });
 }
