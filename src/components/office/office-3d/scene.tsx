@@ -18,8 +18,10 @@ import {
   Environment3D,
   getEnvironmentBackground,
   getEnvironmentBloom,
+  getEnvironmentBloomThreshold,
   getEnvironmentExposure,
 } from "./environment";
+import { ENVIRONMENT_THEMES } from "@/lib/office/visual-styles";
 import { MeetingTable, OfficeChair, Plant } from "./furniture";
 
 function BackgroundSync({ background }: { background: string }) {
@@ -120,6 +122,8 @@ function SceneContent({
   }, [agents, departments, meetingX, meetingZ]);
 
   const bloomIntensity = getEnvironmentBloom(environmentStyle);
+  const bloomThreshold = getEnvironmentBloomThreshold(environmentStyle);
+  const envTheme = ENVIRONMENT_THEMES[environmentStyle];
 
   return (
     <>
@@ -157,7 +161,6 @@ function SceneContent({
 
       <MeetingTable
         position={[meetingX, 0, meetingZ]}
-        color="#6366f1"
         environmentStyle={environmentStyle}
       />
       <Html
@@ -166,8 +169,13 @@ function SceneContent({
         distanceFactor={14}
         style={{ pointerEvents: "none" }}
       >
-        <div className="select-none whitespace-nowrap rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-indigo-300 backdrop-blur-sm"
-          style={{ background: "rgba(0,0,0,0.5)", textShadow: "0 0 8px #6366f180" }}
+        <div
+          className="select-none whitespace-nowrap rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest"
+          style={{
+            color: envTheme.hubTableColor,
+            background: envTheme.labelBg,
+            textShadow: envTheme.labelUseGlow ? `0 0 10px ${envTheme.hubTableColor}` : "none",
+          }}
         >
           CEO Command Center
         </div>
@@ -209,7 +217,7 @@ function SceneContent({
       <EffectComposer>
         <Bloom
           intensity={bloomIntensity}
-          luminanceThreshold={0.55}
+          luminanceThreshold={bloomThreshold}
           luminanceSmoothing={0.35}
           mipmapBlur
         />

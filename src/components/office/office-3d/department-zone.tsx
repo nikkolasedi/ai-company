@@ -69,6 +69,23 @@ export function DepartmentZone3D({
   const labelX = cx + labelOffsetZ * Math.sin(facing);
   const labelZ = cz + labelOffsetZ * Math.cos(facing);
 
+  const plantPositions = useMemo(() => {
+    const positions: [number, number, number][] = [];
+    const offsets = [
+      { lx: ZONE_WIDTH / 2 - 0.35, lz: ZONE_DEPTH / 2 - 0.25 },
+      { lx: -ZONE_WIDTH / 2 + 0.35, lz: ZONE_DEPTH / 2 - 0.25 },
+    ];
+    for (let i = 0; i < theme.plantsPerZone; i++) {
+      const o = offsets[i % offsets.length];
+      positions.push([
+        cx + o.lx * Math.cos(facing) - o.lz * Math.sin(facing),
+        0,
+        cz + o.lx * Math.sin(facing) + o.lz * Math.cos(facing),
+      ]);
+    }
+    return positions;
+  }, [cx, cz, facing, theme.plantsPerZone]);
+
   return (
     <group>
       <mesh
@@ -90,7 +107,8 @@ export function DepartmentZone3D({
           emissiveIntensity={theme.zoneEmissive}
           transparent
           opacity={theme.zoneOpacity}
-          roughness={0.85}
+          roughness={environmentStyle === "B" ? 0.3 : 0.85}
+          metalness={environmentStyle === "B" ? 0.2 : 0}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -99,11 +117,23 @@ export function DepartmentZone3D({
         <Line
           points={borderPoints}
           color={department.color}
-          lineWidth={environmentStyle === "B" ? 2.5 : 1.5}
+          lineWidth={theme.zoneBorderWidth}
           transparent
-          opacity={environmentStyle === "B" ? 0.9 : 0.6}
+          opacity={theme.zoneBorderOpacity}
         />
       </group>
+
+      {environmentStyle === "B" && (
+        <group position={[cx, 0.04, cz]} rotation={[0, facing, 0]}>
+          <Line
+            points={borderPoints.map(([x, y, z]) => [x * 0.92, y, z * 0.92] as [number, number, number])}
+            color="#ffffff"
+            lineWidth={0.8}
+            transparent
+            opacity={0.25}
+          />
+        </group>
+      )}
 
       <Html
         position={[labelX, 0.5, labelZ]}
@@ -112,15 +142,15 @@ export function DepartmentZone3D({
         style={{ pointerEvents: "none" }}
       >
         <div
-          className="select-none whitespace-nowrap rounded-md px-2 py-0.5 text-center backdrop-blur-sm"
+          className="select-none whitespace-nowrap rounded-md px-2 py-0.5 text-center"
           style={{
             fontSize: "10px",
             fontWeight: 700,
             color: department.color,
             letterSpacing: "1.2px",
             textTransform: "uppercase",
-            background: "rgba(0,0,0,0.45)",
-            textShadow: `0 0 8px ${department.color}80`,
+            background: theme.labelBg,
+            textShadow: theme.labelUseGlow ? `0 0 10px ${department.color}` : "none",
           }}
         >
           {department.name}
@@ -157,14 +187,9 @@ export function DepartmentZone3D({
         );
       })}
 
-      <Plant
-        position={[
-          cx + (ZONE_WIDTH / 2 - 0.35) * Math.cos(facing) - (ZONE_DEPTH / 2 - 0.25) * Math.sin(facing),
-          0,
-          cz + (ZONE_WIDTH / 2 - 0.35) * Math.sin(facing) + (ZONE_DEPTH / 2 - 0.25) * Math.cos(facing),
-        ]}
-        environmentStyle={environmentStyle}
-      />
+      {plantPositions.map((pos, i) => (
+        <Plant key={`plant-${i}`} position={pos} environmentStyle={environmentStyle} />
+      ))}
     </group>
   );
 }
