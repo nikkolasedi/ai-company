@@ -7,6 +7,7 @@ import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import { useOfficeLiveData } from "@/hooks/use-office-live-data";
 import { useOfficeVisualStyle } from "@/hooks/use-office-visual-style";
 import { Badge } from "@/components/ui/badge";
+import { ConnectorBar } from "./connector-bar";
 import { LiveActivityPanel } from "./live-activity-panel";
 import { Office2DView } from "./office-2d-view";
 import { StyleSwitcher } from "./style-switcher";
@@ -98,6 +99,7 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
               onChange={setViewMode}
               webglAvailable={webglAvailable}
             />
+            <ConnectorBar />
             {ceoAgent && (
               <Link
                 href={`/agents/${ceoAgent.id}`}

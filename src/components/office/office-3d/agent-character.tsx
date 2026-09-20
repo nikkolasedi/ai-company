@@ -23,7 +23,6 @@ interface AgentCharacterProps {
   faceExpression?: FaceExpression;
   badgeKind?: BadgeKind;
   showWorkParticles?: boolean;
-  workParticleOrigin?: [number, number, number];
   isStanding?: boolean;
   isSleeping?: boolean;
 }
@@ -37,7 +36,6 @@ export function AgentCharacter({
   faceExpression = "neutral",
   badgeKind = "none",
   showWorkParticles = false,
-  workParticleOrigin,
   isStanding = false,
   isSleeping = false,
 }: AgentCharacterProps) {

@@ -149,7 +149,6 @@ export function LivingAgent({
         faceExpression={face}
         badgeKind={badge}
         showWorkParticles={working}
-        workParticleOrigin={deskPosition}
         isStanding={standing}
         isSleeping={behavior === "sleeping"}
       />

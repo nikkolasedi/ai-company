@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { requirePermission } from "@/lib/rbac";
 import { db } from "@/lib/db";
+import { resolveApproval } from "@/lib/orchestration/execution-engine";
 import { MembershipRole } from "@prisma/client";
 import { NextResponse } from "next/server";
 
@@ -26,8 +27,16 @@ export async function PATCH(
     return NextResponse.json({ error: "Invalid status" }, { status: 400 });
   }
 
-  const approval = await db.approval.updateMany({
+  const existing = await db.approval.findFirst({
     where: { id, organizationId: session.user.organizationId },
+  });
+
+  if (!existing) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  await db.approval.update({
+    where: { id },
     data: {
       status,
       reviewerId: session.user.id,
@@ -35,8 +44,8 @@ export async function PATCH(
     },
   });
 
-  if (approval.count === 0) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (existing.taskId) {
+    resolveApproval(existing.taskId, status === "APPROVED");
   }
 
   await db.auditLog.create({

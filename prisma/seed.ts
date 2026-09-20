@@ -129,6 +129,9 @@ async function main() {
   await db.execution.deleteMany();
   await db.workflow.deleteMany();
   await db.goal.deleteMany();
+  await db.tool.deleteMany();
+  await db.connector.deleteMany();
+  await db.knowledgeDocument.deleteMany();
   await db.agentMemory.deleteMany();
   await db.agentMetric.deleteMany();
   await db.agent.deleteMany();
@@ -186,8 +189,11 @@ async function main() {
           title: agent.title,
           status: AgentStatus.IDLE,
           systemInstructions: `You are ${agent.name}, the ${agent.role} at Nova Coffee GmbH. Focus on delivering excellent results for the ${dept.name} department.`,
-          model: "mock-gpt-4",
-          tools: ["search", "draft", "analyze"],
+          model: agent.isOrchestrator ? "claude-sonnet-4-20250514" : "gpt-4o-mini",
+          tools: agent.isOrchestrator
+            ? ["search", "draft", "analyze", "delegate"]
+            : ["search", "draft", "analyze"],
+          connectors: ["gmail", "slack", "notion"],
           permissions: agent.isOrchestrator ? "EXECUTE_WITH_APPROVAL" : "EXECUTE",
           deskX: agent.deskX,
           deskY: agent.deskY,
@@ -199,6 +205,73 @@ async function main() {
       allAgents.push(created);
     }
   }
+
+  const connectorDefs = [
+    {
+      name: "Gmail",
+      provider: "gmail",
+      tools: [
+        { name: "gmail_send", description: "Send email via Gmail", permission: "EXECUTE_WITH_APPROVAL" as const },
+        { name: "gmail_search", description: "Search inbox", permission: "READ" as const },
+      ],
+    },
+    {
+      name: "Slack",
+      provider: "slack",
+      tools: [
+        { name: "slack_post", description: "Post to Slack channel", permission: "EXECUTE" as const },
+        { name: "slack_search", description: "Search messages", permission: "READ" as const },
+      ],
+    },
+    {
+      name: "Notion",
+      provider: "notion",
+      tools: [
+        { name: "notion_create_page", description: "Create Notion page", permission: "EXECUTE" as const },
+        { name: "notion_search", description: "Search workspace", permission: "READ" as const },
+      ],
+    },
+    {
+      name: "HubSpot",
+      provider: "hubspot",
+      tools: [
+        { name: "hubspot_create_contact", description: "Create CRM contact", permission: "EXECUTE_WITH_APPROVAL" as const },
+        { name: "hubspot_search", description: "Search CRM", permission: "READ" as const },
+      ],
+    },
+  ];
+
+  for (const def of connectorDefs) {
+    const connector = await db.connector.create({
+      data: {
+        name: def.name,
+        provider: def.provider,
+        status: "CONNECTED",
+        organizationId: org.id,
+        config: { source: "seed", mcp: true },
+      },
+    });
+    for (const tool of def.tools) {
+      await db.tool.create({
+        data: {
+          name: tool.name,
+          description: tool.description,
+          permission: tool.permission,
+          connectorId: connector.id,
+          organizationId: org.id,
+        },
+      });
+    }
+  }
+
+  await db.knowledgeDocument.create({
+    data: {
+      title: "Nova Coffee — Company Overview",
+      content:
+        "Nova Coffee GmbH is a Berlin-based specialty coffee roaster. We serve independent cafés and B2B clients across Germany with single-origin and house blend offerings.",
+      organizationId: org.id,
+    },
+  });
 
   const marketingManager = allAgents.find((a) => a.role === "Marketing Manager")!;
   const salesOutreach = allAgents.find((a) => a.role === "Outreach")!;
