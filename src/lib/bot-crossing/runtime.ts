@@ -1,0 +1,84 @@
+import { installWorldCurve, setCurveView, CURVE_FULL } from "./core/curve.js";
+import { Engine } from "./core/engine.js";
+import { CameraRig } from "./core/camera.js";
+import { Settings, hasStoredSettings } from "./core/settings.js";
+import { Colony } from "./game/colony.js";
+import { loadKit } from "./world/kit.js";
+import { loadCrew, crewRig } from "./agents/crew.js";
+import { PLANETS } from "./world/planet.js";
+import type { BotCrossingThread } from "./adapters/agent-to-thread";
+
+export interface ColonyRuntime {
+  engine: Engine;
+  colony: Colony;
+  rig: CameraRig;
+  settings: Settings;
+  applyThreads: (threads: BotCrossingThread[]) => void;
+  pickAgent: (ndcX: number, ndcY: number, aspect: number) => string | null;
+  dispose: () => void;
+}
+
+export async function bootColony(container: HTMLElement): Promise<ColonyRuntime> {
+  installWorldCurve();
+
+  const settings = new Settings();
+  if (!hasStoredSettings()) {
+    settings.applyPreset("medium");
+  }
+
+  const engine = new Engine(settings).mount(container);
+  const planetKey = settings.get("planet") as keyof typeof PLANETS;
+  engine.setPlanetGrade(PLANETS[planetKey]?.grade);
+  const rig = new CameraRig(engine.camera, engine.canvas, settings);
+  const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer);
+
+  const seen: Record<string, number> = {};
+
+  const settle = (p: Promise<unknown>) =>
+    p.then(() => null, (err: unknown) => err);
+
+  const [kitError, crewError] = await Promise.all([settle(loadKit()), settle(loadCrew())]);
+
+  if (!kitError && !crewError) {
+    colony.astronauts.setRig(crewRig());
+    colony.onAssetsReady();
+  } else {
+    console.error("[BotCrossing] asset load failed:", kitError || crewError);
+  }
+
+  const applyThreads = (list: BotCrossingThread[]) => {
+    const known = new Set(Object.keys(seen));
+    for (const thread of list) {
+      if (!seen[thread.id]) seen[thread.id] = Date.now();
+    }
+    colony.setThreads(list, new Set(), new Set(), known);
+  };
+
+  engine.add({
+    update(dt: number, elapsed: number) {
+      rig.update(dt);
+      setCurveView(rig.target, rig.azimuth, settings.get("worldCurve") * CURVE_FULL);
+      colony.update(dt, elapsed, rig.target);
+      engine.setFocusDistance(rig.distance);
+    },
+  });
+
+  engine.start();
+
+  return {
+    engine,
+    colony,
+    rig,
+    settings,
+    applyThreads,
+    pickAgent(ndcX, ndcY, aspect) {
+      const hit = colony.pick(ndcX, ndcY, aspect);
+      return hit?.id ?? null;
+    },
+    dispose() {
+      engine.stop();
+      engine.dispose();
+      colony.dispose();
+    },
+  };
+}
