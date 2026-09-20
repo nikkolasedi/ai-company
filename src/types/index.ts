@@ -1,6 +1,7 @@
 import type { AgentStatus, ApprovalStatus, TaskStatus } from "@prisma/client";
 
 export type OfficeEventType =
+  | "CONNECTED"
   | "AGENT_STARTED_TASK"
   | "AGENT_THINKING"
   | "AGENT_DELEGATED"
@@ -12,8 +13,8 @@ export type OfficeEventType =
 
 export interface OfficeEvent {
   type: OfficeEventType;
-  agentId: string;
-  agentName: string;
+  agentId?: string;
+  agentName?: string;
   taskId?: string;
   taskTitle?: string;
   message?: string;

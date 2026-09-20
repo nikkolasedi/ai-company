@@ -41,22 +41,16 @@ export const FACE_FOR: Record<VisualBehavior, FaceExpression> = {
   sleeping: "sleep",
 };
 
-const CELEBRATE_MS = 2800;
+import { isCelebrating, markCelebrating } from "@/lib/celebration";
 
-const celebrateUntil = new Map<string, number>();
-
-export function markCelebrating(agentId: string) {
-  celebrateUntil.set(agentId, Date.now() + CELEBRATE_MS);
-}
+export { markCelebrating };
 
 export function visualBehaviorFor(
   status: AgentStatus,
   agentId: string,
   now = Date.now()
 ): VisualBehavior {
-  const until = celebrateUntil.get(agentId);
-  if (until && now < until) return "celebrating";
-  if (until && now >= until) celebrateUntil.delete(agentId);
+  if (isCelebrating(agentId, now)) return "celebrating";
 
   switch (status) {
     case "FAILED":

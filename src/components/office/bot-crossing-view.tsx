@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AgentWithDepartment, OfficeEvent } from "@/types";
 import {
   agentsToThreads,
+  mergeAgentIntoThread,
   patchThreadFromEvent,
   type BotCrossingThread,
 } from "@/lib/bot-crossing/adapters/agent-to-thread";
@@ -20,7 +21,13 @@ export function BotCrossingView({ agents, events, highlightedAgentId }: BotCross
   const containerRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<ColonyRuntime | null>(null);
   const threadsRef = useRef<Map<string, BotCrossingThread>>(new Map());
+  const clickCleanupRef = useRef<(() => void) | null>(null);
+  const [ready, setReady] = useState(false);
   const router = useRouter();
+
+  const applyAllThreads = useCallback((runtime: ColonyRuntime) => {
+    runtime.applyThreads([...threadsRef.current.values()]);
+  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -35,12 +42,13 @@ export function BotCrossingView({ agents, events, highlightedAgentId }: BotCross
         runtime.dispose();
         return;
       }
+
       runtimeRef.current = runtime;
 
       const threads = agentsToThreads(agents);
-      const map = new Map(threads.map((t) => [t.id, t]));
-      threadsRef.current = map;
+      threadsRef.current = new Map(threads.map((t) => [t.id, t]));
       runtime.applyThreads(threads);
+      setReady(true);
 
       const canvas = container.querySelector("canvas");
       if (canvas) {
@@ -53,47 +61,54 @@ export function BotCrossingView({ agents, events, highlightedAgentId }: BotCross
           if (id) router.push(`/agents/${id}`);
         };
         canvas.addEventListener("click", onClick);
-        return () => canvas.removeEventListener("click", onClick);
+        clickCleanupRef.current = () => canvas.removeEventListener("click", onClick);
       }
     });
 
     return () => {
       disposed = true;
+      clickCleanupRef.current?.();
+      clickCleanupRef.current = null;
       runtimeRef.current?.dispose();
       runtimeRef.current = null;
+      setReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    if (!ready) return;
     const runtime = runtimeRef.current;
     if (!runtime) return;
 
-    const threads = agentsToThreads(agents);
-    const map = new Map(threads.map((t) => [t.id, t]));
-    threadsRef.current = map;
-    runtime.applyThreads(threads);
-  }, [agents]);
+    for (const agent of agents) {
+      const existing = threadsRef.current.get(agent.id);
+      threadsRef.current.set(agent.id, mergeAgentIntoThread(existing, agent));
+    }
+    applyAllThreads(runtime);
+  }, [agents, ready, applyAllThreads]);
 
   useEffect(() => {
+    if (!ready || !events.length) return;
     const runtime = runtimeRef.current;
-    if (!runtime || !events.length) return;
+    if (!runtime) return;
 
-    const latest = events[0];
-    const existing = threadsRef.current.get(latest.agentId);
-    if (!existing) return;
-
-    const patched = patchThreadFromEvent(existing, latest);
-    threadsRef.current.set(latest.agentId, patched);
-    runtime.applyThreads([...threadsRef.current.values()]);
-  }, [events]);
+    for (const event of events) {
+      if (!event.agentId || event.type === "CONNECTED") continue;
+      const existing = threadsRef.current.get(event.agentId);
+      if (!existing) continue;
+      threadsRef.current.set(event.agentId, patchThreadFromEvent(existing, event));
+    }
+    applyAllThreads(runtime);
+  }, [events, ready, applyAllThreads]);
 
   useEffect(() => {
+    if (!ready || !highlightedAgentId) return;
     const runtime = runtimeRef.current;
-    if (!runtime || !highlightedAgentId) return;
+    if (!runtime) return;
     const agent = runtime.colony.agentFor(highlightedAgentId);
     if (agent) runtime.colony.astronauts.setSelected(agent);
-  }, [highlightedAgentId]);
+  }, [highlightedAgentId, ready]);
 
   return (
     <div

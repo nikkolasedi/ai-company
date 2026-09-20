@@ -235,75 +235,106 @@ export async function startExecution(executionId: string): Promise<void> {
   if (runningExecutions.has(executionId)) return;
   runningExecutions.add(executionId);
 
-  await refreshMcpDiscovery();
+  let failed = false;
 
-  const execution = await db.execution.findUniqueOrThrow({
-    where: { id: executionId },
-  });
+  try {
+    await refreshMcpDiscovery();
 
-  const plan = execution.planJson as unknown as {
-    goal: string;
-    steps: ExecutionPlanStep[];
-  };
-
-  await db.execution.update({
-    where: { id: executionId },
-    data: { status: ExecutionStatus.RUNNING },
-  });
-
-  const ceo = await db.agent.findFirst({
-    where: { organizationId: execution.organizationId, isOrchestrator: true },
-  });
-
-  const processedGroups = new Set<number>();
-  let previousAgentId: string | null = null;
-
-  for (const step of plan.steps) {
-    if (step.parallelGroup !== undefined) {
-      if (processedGroups.has(step.parallelGroup)) continue;
-      processedGroups.add(step.parallelGroup);
-    }
-
-    const agent = await db.agent.findUnique({
-      where: { id: step.agentId },
-      include: { department: true },
+    const execution = await db.execution.findUniqueOrThrow({
+      where: { id: executionId },
     });
 
-    if (ceo && previousAgentId === ceo.id && agent && agent.id !== ceo.id) {
-      emit("AGENT_DELEGATED", ceo, execution.organizationId, {
-        taskTitle: step.title,
-        message: `Delegated to ${agent.name}`,
-      });
-      emit("AGENT_RECEIVED_TASK", agent, execution.organizationId, {
-        taskTitle: step.title,
-        message: `Received: ${step.title}`,
+    const plan = execution.planJson as unknown as {
+      goal: string;
+      steps: ExecutionPlanStep[];
+    };
+
+    await db.execution.update({
+      where: { id: executionId },
+      data: { status: ExecutionStatus.RUNNING },
+    });
+
+    if (execution.goalId) {
+      await db.goal.update({
+        where: { id: execution.goalId },
+        data: { status: "RUNNING" },
       });
     }
 
-    if (step.team && step.teamPieces?.length) {
-      await runTeamStep(execution.organizationId, executionId, step, plan.goal);
-    } else {
-      await runStep(execution.organizationId, executionId, step, plan.goal);
-    }
-    previousAgentId = step.agentId;
-  }
-
-  await db.execution.update({
-    where: { id: executionId },
-    data: {
-      status: ExecutionStatus.COMPLETED,
-      completedAt: new Date(),
-    },
-  });
-
-  if (execution.goalId) {
-    await db.goal.update({
-      where: { id: execution.goalId },
-      data: { status: "COMPLETED" },
+    const ceo = await db.agent.findFirst({
+      where: { organizationId: execution.organizationId, isOrchestrator: true },
     });
-  }
 
-  runningExecutions.delete(executionId);
+    const processedGroups = new Set<number>();
+    let previousAgentId: string | null = null;
+
+    for (const step of plan.steps) {
+      if (step.parallelGroup !== undefined) {
+        if (processedGroups.has(step.parallelGroup)) continue;
+        processedGroups.add(step.parallelGroup);
+      }
+
+      const agent = await db.agent.findUnique({
+        where: { id: step.agentId },
+        include: { department: true },
+      });
+
+      if (ceo && previousAgentId === ceo.id && agent && agent.id !== ceo.id) {
+        emit("AGENT_DELEGATED", ceo, execution.organizationId, {
+          taskTitle: step.title,
+          message: `Delegated to ${agent.name}`,
+        });
+        emit("AGENT_RECEIVED_TASK", agent, execution.organizationId, {
+          taskTitle: step.title,
+          message: `Received: ${step.title}`,
+        });
+      }
+
+      const ok =
+        step.team && step.teamPieces?.length
+          ? await runTeamStep(execution.organizationId, executionId, step, plan.goal)
+          : await runStep(execution.organizationId, executionId, step, plan.goal);
+
+      if (!ok) {
+        failed = true;
+        break;
+      }
+      previousAgentId = step.agentId;
+    }
+
+    await db.execution.update({
+      where: { id: executionId },
+      data: {
+        status: failed ? ExecutionStatus.FAILED : ExecutionStatus.COMPLETED,
+        completedAt: new Date(),
+      },
+    });
+
+    if (execution.goalId) {
+      await db.goal.update({
+        where: { id: execution.goalId },
+        data: { status: failed ? "FAILED" : "COMPLETED" },
+      });
+    }
+
+    await db.auditLog.create({
+      data: {
+        action: failed ? "EXECUTION_FAILED" : "EXECUTION_COMPLETED",
+        resource: "Execution",
+        resourceId: executionId,
+        organizationId: execution.organizationId,
+        metadata: { goal: plan.goal, steps: plan.steps.length },
+      },
+    });
+  } catch (e) {
+    console.error("[Execution] fatal error:", e);
+    await db.execution.update({
+      where: { id: executionId },
+      data: { status: ExecutionStatus.FAILED, completedAt: new Date() },
+    }).catch(() => {});
+  } finally {
+    runningExecutions.delete(executionId);
+  }
 }
 
 async function runStep(
@@ -311,7 +342,7 @@ async function runStep(
   executionId: string,
   step: ExecutionPlanStep,
   goal: string
-) {
+): Promise<boolean> {
   const agent = await db.agent.findUniqueOrThrow({
     where: { id: step.agentId },
     include: { department: true },
@@ -375,7 +406,7 @@ async function runStep(
       where: { id: task.id },
       data: { status: TaskStatus.FAILED },
     });
-    return;
+    return false;
   }
 
   await db.agent.update({
@@ -444,7 +475,7 @@ async function runStep(
         where: { id: task.id },
         data: { status: TaskStatus.CANCELLED },
       });
-      return;
+      return false;
     }
 
     await db.approval.update({
@@ -469,6 +500,7 @@ async function runStep(
     },
   });
 
+  const { pruneAgentMemories } = await import("@/lib/knowledge/memory");
   await db.agentMemory.create({
     data: {
       agentId: agent.id,
@@ -477,6 +509,7 @@ async function runStep(
       content: `Completed: ${step.title}`,
     },
   });
+  await pruneAgentMemories(agent.id, organizationId);
 
   await db.task.update({
     where: { id: task.id },
@@ -508,6 +541,8 @@ async function runStep(
       metadata: { agentName: agent.name, stepTitle: step.title, cost },
     },
   });
+
+  return true;
 }
 
 async function runTeamStep(
@@ -515,11 +550,10 @@ async function runTeamStep(
   executionId: string,
   step: ExecutionPlanStep,
   goal: string
-) {
+): Promise<boolean> {
   const pieces = step.teamPieces ?? [];
   if (!pieces.length) {
-    await runStep(organizationId, executionId, step, goal);
-    return;
+    return runStep(organizationId, executionId, step, goal);
   }
 
   const lead = await db.agent.findUniqueOrThrow({
@@ -697,7 +731,7 @@ async function runTeamStep(
         where: { id: parentTask.id },
         data: { status: TaskStatus.CANCELLED },
       });
-      return;
+      return false;
     }
 
     await db.approval.update({
@@ -722,6 +756,7 @@ async function runTeamStep(
     },
   });
 
+  const { pruneAgentMemories } = await import("@/lib/knowledge/memory");
   await db.agentMemory.create({
     data: {
       agentId: lead.id,
@@ -730,6 +765,7 @@ async function runTeamStep(
       content: `Team completed: ${step.title}`,
     },
   });
+  await pruneAgentMemories(lead.id, organizationId);
 
   await db.task.update({
     where: { id: parentTask.id },
@@ -751,6 +787,8 @@ async function runTeamStep(
     taskTitle: step.title,
     message: `Team completed: ${step.title}`,
   });
+
+  return true;
 }
 
 export { resolveApproval, waitForApproval };

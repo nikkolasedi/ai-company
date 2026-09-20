@@ -1,5 +1,6 @@
 import type { Agent, Department } from "@prisma/client";
 import { db } from "@/lib/db";
+import { searchKnowledge } from "@/lib/knowledge/search";
 import { skillsPromptText } from "./skills";
 import { connectorsPromptTextAsync } from "./connectors";
 
@@ -15,16 +16,30 @@ export async function buildAgentSystemPrompt(
     take: 10,
   });
 
-  const docs = await db.knowledgeDocument.findMany({
-    where: { organizationId },
-    take: 5,
-    orderBy: { updatedAt: "desc" },
-  });
+  const searchQuery = `${agent.role} ${agent.department.name}`;
+  const hits = await searchKnowledge(organizationId, searchQuery, 6);
+  const docs =
+    hits.length > 0
+      ? hits
+      : (
+          await db.knowledgeDocument.findMany({
+            where: { organizationId },
+            take: 5,
+            orderBy: { updatedAt: "desc" },
+          })
+        ).map((d) => ({
+          id: d.id,
+          title: d.title,
+          snippet: (d.content ?? "").slice(0, 200),
+          score: 0,
+        }));
 
   const skills = skillsPromptText(agent.id, agent.department.slug);
   const tools = await connectorsPromptTextAsync(organizationId, agent.department.slug);
   const lessonsText = lessons.map((l) => `- ${l.content}`).join("\n");
-  const knowledgeText = docs.map((d) => `- [[${d.title}]]`).join("\n");
+  const knowledgeText = docs
+    .map((d) => `- [[${d.title}]]${d.snippet ? `: ${d.snippet}` : ""}`)
+    .join("\n");
 
   return [
     `# Identity`,

@@ -5,15 +5,15 @@ export async function recordLesson(
   agentId: string,
   organizationId: string,
   feedback: string
-): Promise<void> {
+) {
   const trimmed = feedback.trim();
-  if (!trimmed) return;
+  if (!trimmed) throw new Error("feedback is required");
 
   const content = trimmed.startsWith("revise:")
     ? trimmed.slice(7).trim()
     : trimmed;
 
-  await db.agentMemory.create({
+  const memory = await db.agentMemory.create({
     data: {
       agentId,
       organizationId,
@@ -21,6 +21,11 @@ export async function recordLesson(
       content,
     },
   });
+
+  const { pruneAgentMemories } = await import("@/lib/knowledge/memory");
+  await pruneAgentMemories(agentId, organizationId);
+
+  return memory;
 }
 
 export async function getLessons(agentId: string, organizationId: string) {
