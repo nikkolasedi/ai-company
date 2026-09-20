@@ -137,6 +137,9 @@ export function DepartmentZone3D({
           layout.deskY
         );
         const chairOffset = layout.rot === 0 ? 0.42 : -0.42;
+        const chairRotation = layout.rot + Math.PI;
+        const deskFacingOffset = layout.rot === 0 ? -0.05 : 0.05;
+        const chairZ = wz + chairOffset + deskFacingOffset;
 
         return (
           <group key={agent.id}>
@@ -147,14 +150,14 @@ export function DepartmentZone3D({
               environmentStyle={environmentStyle}
             />
             <OfficeChair
-              position={[wx, 0, wz + chairOffset]}
-              rotation={layout.rot}
+              position={[wx, 0, chairZ]}
+              rotation={chairRotation}
               environmentStyle={environmentStyle}
             />
             <AgentCharacter
               agent={agent}
-              position={[wx, 0, wz + chairOffset]}
-              rotation={layout.rot}
+              position={[wx, 0.2, chairZ]}
+              rotation={chairRotation}
               highlight={highlightedAgentId === agent.id}
               avatarStyle={avatarStyle}
             />

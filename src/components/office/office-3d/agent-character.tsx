@@ -80,7 +80,7 @@ export function AgentCharacter({
       {agent.status === "THINKING" && <ThinkingIndicator />}
 
       {isActive && (
-        <mesh position={[0, 0.62, 0]}>
+        <mesh position={[0, 0.48, 0.04]}>
           <sphereGeometry args={[0.04, 8, 8]} />
           <meshStandardMaterial
             color={statusColor}
@@ -104,7 +104,7 @@ export function AgentCharacter({
       )}
 
       {hovered && (
-        <Html position={[0, 0.85, 0]} center distanceFactor={10} style={{ pointerEvents: "none" }}>
+        <Html position={[0, 0.7, 0]} center distanceFactor={10} style={{ pointerEvents: "none" }}>
           <div className="pointer-events-none whitespace-nowrap rounded bg-zinc-900/90 px-2 py-1 text-[11px] text-white shadow-lg backdrop-blur-sm">
             {agent.name} — {agent.role}
           </div>

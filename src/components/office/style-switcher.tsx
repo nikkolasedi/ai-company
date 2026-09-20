@@ -40,7 +40,8 @@ function OptionGroup<T extends string>({
                 : "text-zinc-400 hover:text-zinc-200"
             )}
           >
-            {key}
+            <span className="font-bold">{key}</span>
+            <span className="hidden sm:inline text-[9px] opacity-70"> · {labels[key].split(" ")[0]}</span>
           </button>
         ))}
       </div>

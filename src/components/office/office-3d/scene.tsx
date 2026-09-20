@@ -19,7 +19,7 @@ import {
   getEnvironmentBloom,
   getEnvironmentExposure,
 } from "./environment";
-import { MeetingTable, Plant } from "./furniture";
+import { MeetingTable, OfficeChair, Plant } from "./furniture";
 
 function BackgroundSync({ background }: { background: string }) {
   const { gl } = useThree();
@@ -168,13 +168,20 @@ function SceneContent({
       </Html>
 
       {ceoAgent && (
-        <AgentCharacter
-          agent={ceoAgent}
-          position={[meetingX, 0, meetingZ + 0.5]}
-          rotation={Math.PI}
-          highlight={highlightedAgentId === ceoAgent.id}
-          avatarStyle={avatarStyle}
-        />
+        <>
+          <OfficeChair
+            position={[meetingX, 0, meetingZ + 0.55]}
+            rotation={Math.PI}
+            environmentStyle={environmentStyle}
+          />
+          <AgentCharacter
+            agent={ceoAgent}
+            position={[meetingX, 0.2, meetingZ + 0.55]}
+            rotation={Math.PI}
+            highlight={highlightedAgentId === ceoAgent.id}
+            avatarStyle={avatarStyle}
+          />
+        </>
       )}
 
       <Plant position={[meetingX - 1.8, 0, meetingZ + 1.2]} environmentStyle={environmentStyle} />
