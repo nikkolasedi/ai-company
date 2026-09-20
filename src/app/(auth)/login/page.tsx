@@ -19,18 +19,24 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setError("Invalid credentials");
-      setLoading(false);
-    } else {
+      if (!result || result.error) {
+        setError(result?.error ?? "Sign in failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+
       router.push("/office");
       router.refresh();
+    } catch {
+      setError("Sign in failed. Please try again.");
+      setLoading(false);
     }
   }
 
