@@ -42,9 +42,11 @@ function loadStyles(): VisualStyleState {
       avatarStyle:
         parsed.avatarStyle === "A" ||
         parsed.avatarStyle === "B" ||
-        parsed.avatarStyle === "C"
+        parsed.avatarStyle === "D"
           ? parsed.avatarStyle
-          : DEFAULT_AVATAR_STYLE,
+          : parsed.avatarStyle === "C"
+            ? "D"
+            : DEFAULT_AVATAR_STYLE,
     };
   } catch {
     return {

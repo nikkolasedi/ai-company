@@ -1,5 +1,5 @@
 export type EnvironmentStyle = "A" | "B" | "C";
-export type AvatarStyle = "A" | "B" | "C";
+export type AvatarStyle = "A" | "B" | "D";
 
 export const DEFAULT_ENVIRONMENT_STYLE: EnvironmentStyle = "C";
 export const DEFAULT_AVATAR_STYLE: AvatarStyle = "B";
@@ -13,8 +13,10 @@ export const ENVIRONMENT_STYLE_LABELS: Record<EnvironmentStyle, string> = {
 export const AVATAR_STYLE_LABELS: Record<AvatarStyle, string> = {
   A: "Capsule",
   B: "Low-Poly",
-  C: "Voxel",
+  D: "Realistic",
 };
+
+export const AVATAR_STYLE_OPTIONS: AvatarStyle[] = ["A", "B", "D"];
 
 export interface EnvironmentTheme {
   background: string;

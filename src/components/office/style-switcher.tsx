@@ -2,6 +2,7 @@
 
 import {
   AVATAR_STYLE_LABELS,
+  AVATAR_STYLE_OPTIONS,
   type AvatarStyle,
   ENVIRONMENT_STYLE_LABELS,
   type EnvironmentStyle,
@@ -77,7 +78,7 @@ export function StyleSwitcher({
         <OptionGroup
           label="Agents"
           value={avatarStyle}
-          options={["A", "B", "C"]}
+          options={AVATAR_STYLE_OPTIONS}
           labels={AVATAR_STYLE_LABELS}
           onChange={onAvatarChange}
         />
