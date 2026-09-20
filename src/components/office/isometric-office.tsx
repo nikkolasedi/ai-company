@@ -5,21 +5,19 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import { useOfficeLiveData } from "@/hooks/use-office-live-data";
-import { useOfficeVisualStyle } from "@/hooks/use-office-visual-style";
 import { Badge } from "@/components/ui/badge";
 import { ConnectorBar } from "./connector-bar";
 import { LiveActivityPanel } from "./live-activity-panel";
 import { Office2DView } from "./office-2d-view";
-import { StyleSwitcher } from "./style-switcher";
 import { ViewModeSwitch, type OfficeViewMode } from "./view-mode-switch";
 
-const OfficeScene3D = dynamic(
-  () => import("./office-3d/scene").then((m) => m.OfficeScene3D),
+const BotCrossingView = dynamic(
+  () => import("./bot-crossing-view").then((m) => m.BotCrossingView),
   {
     ssr: false,
     loading: () => (
       <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-zinc-500">
-        Loading 3D scene...
+        Loading colony...
       </div>
     ),
   }
@@ -30,23 +28,16 @@ interface IsometricOfficeProps {
   initialAgents: AgentWithDepartment[];
 }
 
-function Scene3DFallback() {
+function ColonyFallback() {
   return (
     <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-zinc-500">
-      Loading 3D scene...
+      Loading colony...
     </div>
   );
 }
 
 export function IsometricOffice({ departments, initialAgents }: IsometricOfficeProps) {
-  const { agents, events, highlightedAgentId, delegationLinks, toolPulses } =
-    useOfficeLiveData(initialAgents);
-  const {
-    environmentStyle,
-    avatarStyle,
-    setEnvironmentStyle,
-    setAvatarStyle,
-  } = useOfficeVisualStyle();
+  const { agents, events, highlightedAgentId } = useOfficeLiveData(initialAgents);
   const [viewMode, setViewMode] = useState<OfficeViewMode>("3d");
   const [displayMode, setDisplayMode] = useState<OfficeViewMode>("3d");
   const [webglAvailable, setWebglAvailable] = useState(true);
@@ -78,22 +69,14 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-3 sm:p-4 lg:p-6">
         <div className="mb-3 flex shrink-0 flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold sm:text-xl">Virtual Office</h2>
+            <h2 className="text-lg font-semibold sm:text-xl">Agent Colony</h2>
             <p className="text-xs text-zinc-400 sm:text-sm">
               {displayMode === "3d"
-                ? "Drag to orbit · Pinch to zoom · Tap agents to explore"
+                ? "Bot Crossing view · Drag to orbit · Click bots to open profiles"
                 : "Tap departments or agents to explore"}
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2 sm:gap-3">
-            {displayMode === "3d" && (
-              <StyleSwitcher
-                environmentStyle={environmentStyle}
-                avatarStyle={avatarStyle}
-                onEnvironmentChange={setEnvironmentStyle}
-                onAvatarChange={setAvatarStyle}
-              />
-            )}
             <ViewModeSwitch
               viewMode={viewMode}
               onChange={setViewMode}
@@ -123,15 +106,11 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
               />
             </div>
           ) : (
-            <Suspense fallback={<Scene3DFallback />}>
-              <OfficeScene3D
-                departments={departments}
+            <Suspense fallback={<ColonyFallback />}>
+              <BotCrossingView
                 agents={agents}
+                events={events}
                 highlightedAgentId={highlightedAgentId}
-                delegationLinks={delegationLinks}
-                toolPulses={toolPulses}
-                environmentStyle={environmentStyle}
-                avatarStyle={avatarStyle}
               />
             </Suspense>
           )}
