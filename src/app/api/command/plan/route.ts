@@ -8,11 +8,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { goal } = await req.json();
+  const { goal, team } = await req.json();
   if (!goal || typeof goal !== "string") {
     return NextResponse.json({ error: "Goal is required" }, { status: 400 });
   }
 
-  const plan = await submitGoal(session.user.organizationId, goal);
+  const plan = await submitGoal(session.user.organizationId, goal, {
+    team: team === true,
+  });
   return NextResponse.json(plan);
 }

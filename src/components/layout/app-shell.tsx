@@ -13,6 +13,7 @@ import {
   Menu,
   X,
   Brain,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/command", label: "Command", icon: Sparkles },
   { href: "/approvals", label: "Approvals", icon: CheckCircle },
   { href: "/brain", label: "Brain", icon: Brain },
+  { href: "/calendar", label: "Calendar", icon: CalendarDays },
 ];
 
 export function AppShell({

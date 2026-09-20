@@ -32,6 +32,8 @@ export interface ExecutionPlanStep {
   department: string;
   requiresApproval: boolean;
   parallelGroup?: number;
+  team?: boolean;
+  teamPieces?: Array<{ agentId: string; agentName: string; title: string; description: string }>;
   estimatedMinutes: number;
   estimatedCost: number;
 }
@@ -45,6 +47,7 @@ export interface ExecutionPlan {
   estimatedCost: number;
   estimatedMinutes: number;
   requiresApproval: boolean;
+  isTeam?: boolean;
 }
 
 export interface DashboardStats {

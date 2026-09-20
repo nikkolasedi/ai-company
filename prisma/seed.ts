@@ -392,6 +392,39 @@ async function main() {
     });
   }
 
+  const salesManager = allAgents.find((a) => a.role === "Sales Manager")!;
+  const tomorrow8am = new Date();
+  tomorrow8am.setDate(tomorrow8am.getDate() + 1);
+  tomorrow8am.setHours(8, 0, 0, 0);
+
+  await db.routine.create({
+    data: {
+      title: "Review sales pipeline",
+      text: "Review sales pipeline and flag stale deals",
+      departmentSlug: "sales",
+      agentId: salesManager.id,
+      organizationId: org.id,
+      whenJson: { kind: "weekdays", at: "08:00" },
+      needsApproval: false,
+      team: false,
+      nextAt: tomorrow8am,
+    },
+  });
+
+  await db.routine.create({
+    data: {
+      title: "Weekly marketing content review",
+      text: "As a team, review content calendar and draft social posts",
+      departmentSlug: "marketing",
+      agentId: marketingManager.id,
+      organizationId: org.id,
+      whenJson: { kind: "weekly", days: [1], at: "09:00" },
+      needsApproval: false,
+      team: true,
+      nextAt: tomorrow8am,
+    },
+  });
+
   console.log(`Seeded ${allAgents.length} agents across ${DEPARTMENTS.length} departments`);
 }
 

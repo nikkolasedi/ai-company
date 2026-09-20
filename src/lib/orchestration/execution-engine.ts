@@ -8,6 +8,7 @@ import { routeTask } from "./router";
 import { executeTool, getAllowedTools, refreshMcpDiscovery } from "./connectors";
 import { waitForApproval, resolveApproval } from "./approval-gate";
 import { skillNamesForAgent } from "./skills";
+import { planTeamPieces, synthesizeTeam, teamIntent } from "./teams";
 
 const runningExecutions = new Set<string>();
 
@@ -36,8 +37,10 @@ interface PlanStepDraft {
 
 export async function submitGoal(
   organizationId: string,
-  goal: string
+  goal: string,
+  options?: { team?: boolean }
 ): Promise<ExecutionPlan> {
+  const useTeam = options?.team ?? teamIntent(goal);
   const agents = await db.agent.findMany({
     where: { organizationId },
     include: { department: true },
@@ -100,6 +103,37 @@ JSON plan`;
     steps = buildFallbackPlan(agents, goal);
   }
 
+  if (useTeam) {
+    const teamDept =
+      steps.find((s) => /marketing|sales/i.test(s.department))?.department ??
+      steps[1]?.department;
+    const deptSlug = agents.find((a) => a.department.name === teamDept)?.department.slug ?? "marketing";
+    const { pieces, why, solo } = await planTeamPieces(agents, deptSlug, goal, ceo?.model);
+
+    if (!solo && pieces.length > 1) {
+      const lead = agents.find((a) => a.id === pieces[0].agentId) ?? agents[0];
+      steps = steps.filter((s) => s.department !== teamDept);
+      steps.splice(1, 0, {
+        id: "step-team",
+        title: `Team execution: ${deptSlug}`,
+        description: why || goal,
+        agentId: lead.id,
+        agentName: lead.name,
+        department: lead.department.name,
+        requiresApproval: /send|email|outreach/i.test(goal),
+        team: true,
+        teamPieces: pieces.map((p) => ({
+          agentId: p.agentId,
+          agentName: p.agentName,
+          title: p.title,
+          description: p.text,
+        })),
+        estimatedMinutes: 8,
+        estimatedCost: 0.25,
+      });
+    }
+  }
+
   const participatingAgents = [
     ...new Map(
       steps.map((s) => [s.agentId, { id: s.agentId, name: s.agentName, role: s.department }])
@@ -132,12 +166,13 @@ JSON plan`;
   return {
     id: execution.id,
     goal,
-    summary: `AI plan with ${steps.length} steps involving ${participatingAgents.length} agents`,
+    summary: `AI plan with ${steps.length} steps involving ${participatingAgents.length} agents${useTeam ? " (team mode)" : ""}`,
     steps,
     participatingAgents,
     estimatedCost,
     estimatedMinutes,
     requiresApproval: steps.some((s) => s.requiresApproval),
+    isTeam: useTeam,
   };
 }
 
@@ -245,7 +280,11 @@ export async function startExecution(executionId: string): Promise<void> {
       });
     }
 
-    await runStep(execution.organizationId, executionId, step, plan.goal);
+    if (step.team && step.teamPieces?.length) {
+      await runTeamStep(execution.organizationId, executionId, step, plan.goal);
+    } else {
+      await runStep(execution.organizationId, executionId, step, plan.goal);
+    }
     previousAgentId = step.agentId;
   }
 
@@ -414,10 +453,18 @@ async function runStep(
     });
   }
 
+  const overview = await db.knowledgeDocument.findFirst({
+    where: { organizationId, title: { contains: "Company Overview" } },
+  });
+
+  const linkedResult = overview
+    ? `${result}\n\n---\nRelated: [[${overview.title}]]`
+    : result;
+
   await db.knowledgeDocument.create({
     data: {
       title: `${step.title} — ${new Date().toISOString().slice(0, 10)}`,
-      content: result,
+      content: linkedResult,
       organizationId,
     },
   });
@@ -460,6 +507,249 @@ async function runStep(
       organizationId,
       metadata: { agentName: agent.name, stepTitle: step.title, cost },
     },
+  });
+}
+
+async function runTeamStep(
+  organizationId: string,
+  executionId: string,
+  step: ExecutionPlanStep,
+  goal: string
+) {
+  const pieces = step.teamPieces ?? [];
+  if (!pieces.length) {
+    await runStep(organizationId, executionId, step, goal);
+    return;
+  }
+
+  const lead = await db.agent.findUniqueOrThrow({
+    where: { id: step.agentId },
+    include: { department: true },
+  });
+
+  const parentTask = await db.task.create({
+    data: {
+      title: step.title,
+      description: step.description,
+      status: TaskStatus.RUNNING,
+      organizationId,
+      executionId,
+      assignedAgentId: step.agentId,
+      estimatedCost: step.estimatedCost,
+      estimatedMinutes: step.estimatedMinutes,
+    },
+  });
+
+  await db.agent.update({
+    where: { id: step.agentId },
+    data: { status: AgentStatus.THINKING, currentTaskId: parentTask.id },
+  });
+
+  emit("AGENT_STARTED_TASK", lead, organizationId, {
+    taskId: parentTask.id,
+    taskTitle: step.title,
+    message: `Team lead started: ${step.title}`,
+  });
+
+  const pieceResults = await Promise.all(
+    pieces.map(async (piece) => {
+      const agent = await db.agent.findUniqueOrThrow({
+        where: { id: piece.agentId },
+        include: { department: true },
+      });
+
+      const task = await db.task.create({
+        data: {
+          title: piece.title,
+          description: piece.description,
+          status: TaskStatus.RUNNING,
+          organizationId,
+          executionId,
+          assignedAgentId: piece.agentId,
+          estimatedCost: 0.05,
+          estimatedMinutes: 3,
+        },
+      });
+
+      await db.agent.update({
+        where: { id: piece.agentId },
+        data: { status: AgentStatus.THINKING, currentTaskId: task.id },
+      });
+
+      emit("AGENT_RECEIVED_TASK", agent, organizationId, {
+        taskId: task.id,
+        taskTitle: piece.title,
+        message: `Team piece: ${piece.title}`,
+      });
+
+      const systemPrompt = await buildAgentSystemPrompt(agent, organizationId);
+      const provider = providerForModel(agent.model);
+
+      let body = "";
+      let cost = 0;
+
+      try {
+        const completion = await provider.complete({
+          systemPrompt,
+          userPrompt: `Company goal: ${goal}\n\nYour team piece: ${piece.title}\n${piece.description}\n\nProduce your contribution.`,
+          maxTokens: 1500,
+        });
+        body = completion.content;
+        cost = completion.cost;
+      } catch (e) {
+        emit("AGENT_FAILED", agent, organizationId, {
+          taskId: task.id,
+          taskTitle: piece.title,
+          message: `Failed: ${e instanceof Error ? e.message : "Unknown error"}`,
+        });
+        await db.agent.update({
+          where: { id: piece.agentId },
+          data: { status: AgentStatus.FAILED, currentTaskId: null },
+        });
+        await db.task.update({
+          where: { id: task.id },
+          data: { status: TaskStatus.FAILED },
+        });
+        return { agentName: piece.agentName, title: piece.title, body: "", cost: 0 };
+      }
+
+      await db.task.update({
+        where: { id: task.id },
+        data: {
+          status: TaskStatus.COMPLETED,
+          completedAt: new Date(),
+          result: body,
+          estimatedCost: cost,
+        },
+      });
+
+      await db.agent.update({
+        where: { id: piece.agentId },
+        data: { status: AgentStatus.IDLE, currentTaskId: null },
+      });
+
+      emit("AGENT_COMPLETED", agent, organizationId, {
+        taskId: task.id,
+        taskTitle: piece.title,
+        message: `Completed team piece: ${piece.title}`,
+      });
+
+      return { agentName: piece.agentName, title: piece.title, body, cost };
+    })
+  );
+
+  await db.agent.update({
+    where: { id: step.agentId },
+    data: { status: AgentStatus.WORKING },
+  });
+
+  emit("AGENT_THINKING", lead, organizationId, {
+    taskId: parentTask.id,
+    taskTitle: step.title,
+    message: "Synthesizing team outputs...",
+  });
+
+  const validPieces = pieceResults.filter((p) => p.body);
+  const result = await synthesizeTeam(lead, goal, validPieces);
+  const cost = pieceResults.reduce((sum, p) => sum + p.cost, 0);
+
+  if (step.requiresApproval) {
+    await db.task.update({
+      where: { id: parentTask.id },
+      data: { status: TaskStatus.AWAITING_APPROVAL, result },
+    });
+
+    await db.agent.update({
+      where: { id: step.agentId },
+      data: { status: AgentStatus.WAITING_APPROVAL },
+    });
+
+    const approval = await db.approval.create({
+      data: {
+        title: `Approve team deliverable: ${step.title}`,
+        description: result.slice(0, 500),
+        actionType: "EXECUTE_WITH_APPROVAL",
+        status: "PENDING",
+        organizationId,
+        taskId: parentTask.id,
+        payload: { stepId: step.id, agentId: step.agentId, draft: result, team: true },
+      },
+    });
+
+    emit("AGENT_WAITING_APPROVAL", lead, organizationId, {
+      taskId: parentTask.id,
+      taskTitle: step.title,
+      message: "Team deliverable ready — waiting for CEO approval",
+    });
+
+    const approved = await waitForApproval(parentTask.id);
+
+    if (!approved) {
+      await db.approval.update({
+        where: { id: approval.id },
+        data: { status: "REJECTED", reviewedAt: new Date() },
+      });
+      await db.agent.update({
+        where: { id: step.agentId },
+        data: { status: AgentStatus.IDLE, currentTaskId: null },
+      });
+      await db.task.update({
+        where: { id: parentTask.id },
+        data: { status: TaskStatus.CANCELLED },
+      });
+      return;
+    }
+
+    await db.approval.update({
+      where: { id: approval.id },
+      data: { status: "APPROVED", reviewedAt: new Date() },
+    });
+  }
+
+  const overview = await db.knowledgeDocument.findFirst({
+    where: { organizationId, title: { contains: "Company Overview" } },
+  });
+
+  const linkedResult = overview
+    ? `${result}\n\n---\nRelated: [[${overview.title}]]`
+    : result;
+
+  await db.knowledgeDocument.create({
+    data: {
+      title: `${step.title} — ${new Date().toISOString().slice(0, 10)}`,
+      content: linkedResult,
+      organizationId,
+    },
+  });
+
+  await db.agentMemory.create({
+    data: {
+      agentId: lead.id,
+      organizationId,
+      type: "task",
+      content: `Team completed: ${step.title}`,
+    },
+  });
+
+  await db.task.update({
+    where: { id: parentTask.id },
+    data: {
+      status: TaskStatus.COMPLETED,
+      completedAt: new Date(),
+      result,
+      estimatedCost: cost,
+    },
+  });
+
+  await db.agent.update({
+    where: { id: step.agentId },
+    data: { status: AgentStatus.IDLE, currentTaskId: null },
+  });
+
+  emit("AGENT_COMPLETED", lead, organizationId, {
+    taskId: parentTask.id,
+    taskTitle: step.title,
+    message: `Team completed: ${step.title}`,
   });
 }
 
