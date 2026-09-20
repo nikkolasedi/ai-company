@@ -15,6 +15,7 @@ import { ThinkingIndicator } from "./thinking-indicator";
 interface AgentCharacterProps {
   agent: AgentWithDepartment;
   position: [number, number, number];
+  rotation?: number;
   highlight?: boolean;
   avatarStyle?: AvatarStyle;
 }
@@ -22,6 +23,7 @@ interface AgentCharacterProps {
 export function AgentCharacter({
   agent,
   position,
+  rotation = 0,
   highlight,
   avatarStyle = "B",
 }: AgentCharacterProps) {
@@ -44,11 +46,11 @@ export function AgentCharacter({
     pos.z += (position[2] - pos.z) * lerpFactor;
 
     if (agent.status === "WORKING") {
-      bodyRef.current.position.y = Math.abs(Math.sin(t * 6)) * 0.04;
+      bodyRef.current.position.y = Math.abs(Math.sin(t * 6)) * 0.02;
     } else if (agent.status === "DELEGATING") {
-      bodyRef.current.position.y = Math.sin(t * 4) * 0.03;
+      bodyRef.current.position.y = Math.sin(t * 4) * 0.015;
     } else {
-      bodyRef.current.position.y = Math.sin(t * 2) * 0.02;
+      bodyRef.current.position.y = Math.sin(t * 2) * 0.01;
     }
   });
 
@@ -56,6 +58,7 @@ export function AgentCharacter({
     <group
       ref={groupRef}
       position={position}
+      rotation={[0, rotation, 0]}
       onClick={(e) => {
         e.stopPropagation();
         router.push(`/agents/${agent.id}`);
@@ -77,23 +80,23 @@ export function AgentCharacter({
       {agent.status === "THINKING" && <ThinkingIndicator />}
 
       {isActive && (
-        <mesh position={[0, 0.82, 0]}>
-          <sphereGeometry args={[0.05, 8, 8]} />
+        <mesh position={[0, 0.62, 0]}>
+          <sphereGeometry args={[0.04, 8, 8]} />
           <meshStandardMaterial
             color={statusColor}
             emissive={statusColor}
-            emissiveIntensity={1.5}
+            emissiveIntensity={1.8}
           />
         </mesh>
       )}
 
       {(highlight || hovered) && (
         <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-          <ringGeometry args={[0.25, 0.3, 32]} />
+          <ringGeometry args={[0.22, 0.27, 32]} />
           <meshStandardMaterial
             color={highlight ? "#ffffff" : statusColor}
             emissive={highlight ? "#ffffff" : statusColor}
-            emissiveIntensity={0.5}
+            emissiveIntensity={0.6}
             transparent
             opacity={0.85}
           />
@@ -101,8 +104,8 @@ export function AgentCharacter({
       )}
 
       {hovered && (
-        <Html position={[0, 1.1, 0]} center transform={false} style={{ pointerEvents: "none" }}>
-          <div className="pointer-events-none whitespace-nowrap rounded bg-zinc-900 px-2 py-1 text-[11px] text-white shadow">
+        <Html position={[0, 0.85, 0]} center distanceFactor={10} style={{ pointerEvents: "none" }}>
+          <div className="pointer-events-none whitespace-nowrap rounded bg-zinc-900/90 px-2 py-1 text-[11px] text-white shadow-lg backdrop-blur-sm">
             {agent.name} — {agent.role}
           </div>
         </Html>

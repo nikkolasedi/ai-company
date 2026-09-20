@@ -1,7 +1,9 @@
 "use client";
 
-import { Html } from "@react-three/drei";
+import { Html, Line } from "@react-three/drei";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import * as THREE from "three";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import type { AvatarStyle, EnvironmentStyle } from "@/lib/office/visual-styles";
 import { ENVIRONMENT_THEMES } from "@/lib/office/visual-styles";
@@ -26,6 +28,21 @@ const DESK_LAYOUTS: Array<{ deskX: number; deskY: number; rot: number }> = [
   { deskX: 300, deskY: 20, rot: Math.PI },
 ];
 
+function hexPoints(w: number, d: number): [number, number, number][] {
+  const hw = w / 2;
+  const hd = d / 2;
+  const pts: [number, number, number][] = [
+    [-hw * 0.55, 0, -hd],
+    [hw * 0.55, 0, -hd],
+    [hw, 0, 0],
+    [hw * 0.55, 0, hd],
+    [-hw * 0.55, 0, hd],
+    [-hw, 0, 0],
+    [-hw * 0.55, 0, -hd],
+  ];
+  return pts;
+}
+
 export function DepartmentZone3D({
   department,
   agents,
@@ -38,6 +55,22 @@ export function DepartmentZone3D({
   const zoneWidth = 5.2;
   const zoneDepth = 2.8;
   const theme = ENVIRONMENT_THEMES[environmentStyle];
+
+  const hexShape = useMemo(() => {
+    const shape = new THREE.Shape();
+    const hw = zoneWidth / 2;
+    const hd = zoneDepth / 2;
+    shape.moveTo(-hw * 0.55, -hd);
+    shape.lineTo(hw * 0.55, -hd);
+    shape.lineTo(hw, 0);
+    shape.lineTo(hw * 0.55, hd);
+    shape.lineTo(-hw * 0.55, hd);
+    shape.lineTo(-hw, 0);
+    shape.closePath();
+    return shape;
+  }, [zoneWidth, zoneDepth]);
+
+  const borderPoints = useMemo(() => hexPoints(zoneWidth, zoneDepth), [zoneWidth, zoneDepth]);
 
   return (
     <group>
@@ -53,7 +86,7 @@ export function DepartmentZone3D({
           document.body.style.cursor = "auto";
         }}
       >
-        <planeGeometry args={[zoneWidth, zoneDepth]} />
+        <shapeGeometry args={[hexShape]} />
         <meshStandardMaterial
           color={department.color}
           emissive={department.color}
@@ -61,30 +94,34 @@ export function DepartmentZone3D({
           transparent
           opacity={theme.zoneOpacity}
           roughness={0.85}
+          side={THREE.DoubleSide}
         />
       </mesh>
 
-      <mesh position={[cx, 0.02, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[zoneWidth / 2 - 0.06, zoneWidth / 2, 4]} />
-        <meshStandardMaterial
-          color={department.color}
-          emissive={department.color}
-          emissiveIntensity={theme.zoneEmissive * 1.5}
-          transparent
-          opacity={0.55}
-        />
-      </mesh>
+      <Line
+        points={borderPoints.map(([x, y, z]) => [cx + x, 0.03, cz + z] as [number, number, number])}
+        color={department.color}
+        lineWidth={environmentStyle === "B" ? 2.5 : 1.5}
+        transparent
+        opacity={environmentStyle === "B" ? 0.9 : 0.6}
+      />
 
-      <Html position={[cx, 0.08, cz - zoneDepth / 2 + 0.3]} center style={{ pointerEvents: "none" }}>
+      <Html
+        position={[cx, 0.5, cz - zoneDepth / 2 + 0.15]}
+        center
+        distanceFactor={12}
+        style={{ pointerEvents: "none" }}
+      >
         <div
-          className="select-none text-center"
+          className="select-none whitespace-nowrap rounded-md px-2 py-0.5 text-center backdrop-blur-sm"
           style={{
-            fontSize: "11px",
-            fontWeight: 600,
+            fontSize: "10px",
+            fontWeight: 700,
             color: department.color,
-            letterSpacing: "1.5px",
+            letterSpacing: "1.2px",
             textTransform: "uppercase",
-            textShadow: "0 1px 3px rgba(0,0,0,0.5)",
+            background: "rgba(0,0,0,0.45)",
+            textShadow: `0 0 8px ${department.color}80`,
           }}
         >
           {department.name}
@@ -99,7 +136,7 @@ export function DepartmentZone3D({
           layout.deskX,
           layout.deskY
         );
-        const chairOffset = layout.rot === 0 ? 0.45 : -0.45;
+        const chairOffset = layout.rot === 0 ? 0.42 : -0.42;
 
         return (
           <group key={agent.id}>
@@ -107,15 +144,17 @@ export function DepartmentZone3D({
               position={[wx, 0, wz]}
               rotation={layout.rot}
               screenColor={department.color}
+              environmentStyle={environmentStyle}
             />
             <OfficeChair
               position={[wx, 0, wz + chairOffset]}
               rotation={layout.rot}
-              color={i % 2 === 0 ? "#4a5568" : "#3a5068"}
+              environmentStyle={environmentStyle}
             />
             <AgentCharacter
               agent={agent}
-              position={[wx, 0, wz + chairOffset * 0.5]}
+              position={[wx, 0, wz + chairOffset]}
+              rotation={layout.rot}
               highlight={highlightedAgentId === agent.id}
               avatarStyle={avatarStyle}
             />
@@ -123,7 +162,10 @@ export function DepartmentZone3D({
         );
       })}
 
-      <Plant position={[cx - zoneWidth / 2 + 0.3, 0, cz + zoneDepth / 2 - 0.3]} />
+      <Plant
+        position={[cx - zoneWidth / 2 + 0.35, 0, cz + zoneDepth / 2 - 0.25]}
+        environmentStyle={environmentStyle}
+      />
     </group>
   );
 }

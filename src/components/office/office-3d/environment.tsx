@@ -1,5 +1,6 @@
 "use client";
 
+import { ContactShadows } from "@react-three/drei";
 import type { EnvironmentStyle } from "@/lib/office/visual-styles";
 import { ENVIRONMENT_THEMES } from "@/lib/office/visual-styles";
 import { SCENE_CENTER, WORLD_DEPTH, WORLD_WIDTH } from "@/lib/office/coordinates";
@@ -30,6 +31,8 @@ export function Environment3D({ style }: { style: EnvironmentStyle }) {
 
   return (
     <group>
+      <fog attach="fog" args={[theme.fogColor, theme.fogNear, theme.fogFar]} />
+
       <ambientLight intensity={theme.ambientIntensity} />
       <directionalLight
         position={[12, 18, 10]}
@@ -41,23 +44,26 @@ export function Environment3D({ style }: { style: EnvironmentStyle }) {
         shadow-camera-top={12}
         shadow-camera-bottom={-12}
       />
-      <hemisphereLight
-        args={[theme.hemisphereSky, theme.hemisphereGround, 0.35]}
-      />
+      <hemisphereLight args={[theme.hemisphereSky, theme.hemisphereGround, 0.4]} />
 
       {theme.showWarmLights && (
         <>
-          <pointLight position={[4, 2.5, 4]} intensity={0.5} color="#ffd599" distance={8} decay={2} />
-          <pointLight position={[14, 2.5, 10]} intensity={0.4} color="#ffb86c" distance={8} decay={2} />
+          <pointLight position={[4, 2.5, 4]} intensity={0.6} color="#ffd599" distance={10} decay={2} />
+          <pointLight position={[14, 2.5, 10]} intensity={0.5} color="#ffb86c" distance={10} decay={2} />
+          <pointLight position={[9, 2, 7]} intensity={0.35} color="#ff9f5a" distance={8} decay={2} />
         </>
       )}
 
       {style === "B" && (
         <>
-          <pointLight position={[cx, 1.5, cz]} intensity={0.6} color="#6366f1" distance={12} decay={2} />
-          <pointLight position={[4, 1.2, 4]} intensity={0.4} color="#06b6d4" distance={6} decay={2} />
-          <pointLight position={[14, 1.2, 10]} intensity={0.4} color="#ec4899" distance={6} decay={2} />
+          <pointLight position={[cx, 1.5, cz]} intensity={0.7} color="#6366f1" distance={14} decay={2} />
+          <pointLight position={[4, 1.2, 4]} intensity={0.5} color="#06b6d4" distance={8} decay={2} />
+          <pointLight position={[14, 1.2, 10]} intensity={0.5} color="#ec4899" distance={8} decay={2} />
         </>
+      )}
+
+      {style === "A" && (
+        <directionalLight position={[-8, 12, 6]} intensity={0.4} color="#fff8f0" />
       )}
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, -0.08, cz]} receiveShadow>
@@ -67,13 +73,19 @@ export function Environment3D({ style }: { style: EnvironmentStyle }) {
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[cx, 0.01, cz]} receiveShadow>
         <planeGeometry args={[WORLD_WIDTH, WORLD_DEPTH]} />
-        <meshStandardMaterial color={theme.floor} roughness={0.7} metalness={style === "B" ? 0.15 : 0.02} />
+        <meshStandardMaterial
+          color={theme.floor}
+          roughness={style === "B" ? 0.2 : 0.7}
+          metalness={style === "B" ? 0.25 : 0.02}
+        />
       </mesh>
 
-      <gridHelper
-        args={[WORLD_WIDTH, 18, theme.gridPrimary, theme.gridSecondary]}
-        position={[cx, 0.02, cz]}
-      />
+      {theme.showGrid && (
+        <gridHelper
+          args={[WORLD_WIDTH, 18, theme.gridPrimary, theme.gridSecondary]}
+          position={[cx, 0.02, cz]}
+        />
+      )}
 
       {theme.showWalls && (
         <>
@@ -84,6 +96,15 @@ export function Environment3D({ style }: { style: EnvironmentStyle }) {
           <Wall position={[cx * 0.55, WALL_HEIGHT * 0.35, cz]} size={[WORLD_WIDTH * 0.45, WALL_HEIGHT * 0.7, 0.08]} color={theme.wall} />
         </>
       )}
+
+      <ContactShadows
+        position={[cx, 0.015, cz]}
+        opacity={style === "A" ? 0.35 : 0.5}
+        scale={22}
+        blur={2.5}
+        far={4}
+        color="#000000"
+      />
     </group>
   );
 }
@@ -94,4 +115,8 @@ export function getEnvironmentBackground(style: EnvironmentStyle) {
 
 export function getEnvironmentBloom(style: EnvironmentStyle) {
   return ENVIRONMENT_THEMES[style].bloomIntensity;
+}
+
+export function getEnvironmentExposure(style: EnvironmentStyle) {
+  return ENVIRONMENT_THEMES[style].exposure;
 }
