@@ -2,6 +2,7 @@
 
 import { AuthError } from "next-auth";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 
 export async function loginAction(formData: FormData) {
@@ -14,7 +15,7 @@ export async function loginAction(formData: FormData) {
   } catch (error) {
     if (isRedirectError(error)) throw error;
     if (error instanceof AuthError) {
-      return { error: "Invalid email or password. Please try again." };
+      redirect("/login?error=Invalid%20email%20or%20password");
     }
     throw error;
   }

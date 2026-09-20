@@ -1,19 +1,14 @@
-"use client";
-
-import { useActionState } from "react";
-import { Building2, Loader2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { loginAction } from "./actions";
 
-export default function LoginPage() {
-  const [state, formAction, pending] = useActionState(
-    async (_prev: { error?: string } | null, formData: FormData) => {
-      const result = await loginAction(formData);
-      return result ?? null;
-    },
-    null
-  );
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-indigo-950 p-4">
@@ -28,7 +23,7 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form action={formAction} className="space-y-4">
+          <form action={loginAction} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-sm text-zinc-400" htmlFor="email">
                 Email
@@ -57,16 +52,9 @@ export default function LoginPage() {
                 required
               />
             </div>
-            {state?.error && <p className="text-sm text-red-400">{state.error}</p>}
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign in to Nova Coffee GmbH"
-              )}
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            <Button type="submit" className="w-full">
+              Sign in to Nova Coffee GmbH
             </Button>
           </form>
           <p className="mt-4 text-center text-xs text-zinc-500">
