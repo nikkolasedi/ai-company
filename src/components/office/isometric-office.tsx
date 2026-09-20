@@ -38,7 +38,7 @@ function Scene3DFallback() {
 }
 
 export function IsometricOffice({ departments, initialAgents }: IsometricOfficeProps) {
-  const { agents, events, highlightedAgentId, delegationLinks } =
+  const { agents, events, highlightedAgentId, delegationLinks, toolPulses } =
     useOfficeLiveData(initialAgents);
   const {
     environmentStyle,
@@ -127,6 +127,7 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
                 agents={agents}
                 highlightedAgentId={highlightedAgentId}
                 delegationLinks={delegationLinks}
+                toolPulses={toolPulses}
                 environmentStyle={environmentStyle}
                 avatarStyle={avatarStyle}
               />

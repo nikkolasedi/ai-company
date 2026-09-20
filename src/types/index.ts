@@ -7,7 +7,8 @@ export type OfficeEventType =
   | "AGENT_RECEIVED_TASK"
   | "AGENT_COMPLETED"
   | "AGENT_WAITING_APPROVAL"
-  | "AGENT_FAILED";
+  | "AGENT_FAILED"
+  | "AGENT_TOOL_USED";
 
 export interface OfficeEvent {
   type: OfficeEventType;
@@ -16,6 +17,8 @@ export interface OfficeEvent {
   taskId?: string;
   taskTitle?: string;
   message?: string;
+  toolName?: string;
+  departmentSlug?: string;
   timestamp: string;
   organizationId: string;
 }

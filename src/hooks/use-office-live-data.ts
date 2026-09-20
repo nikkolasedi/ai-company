@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { AgentWithDepartment, OfficeEvent } from "@/types";
+import { markCelebrating } from "@/lib/office/agent-behavior";
 
 const STATUS_MAP: Record<string, AgentWithDepartment["status"]> = {
   AGENT_STARTED_TASK: "WORKING",
@@ -11,6 +12,7 @@ const STATUS_MAP: Record<string, AgentWithDepartment["status"]> = {
   AGENT_COMPLETED: "IDLE",
   AGENT_WAITING_APPROVAL: "WAITING_APPROVAL",
   AGENT_FAILED: "FAILED",
+  AGENT_TOOL_USED: "WORKING",
 };
 
 export interface DelegationLink {
@@ -19,11 +21,21 @@ export interface DelegationLink {
   timestamp: number;
 }
 
+export interface ToolUsePulse {
+  id: string;
+  agentId: string;
+  departmentSlug: string;
+  color: string;
+  agentPosition: [number, number, number];
+  timestamp: number;
+}
+
 export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
   const [agents, setAgents] = useState(initialAgents);
   const [events, setEvents] = useState<OfficeEvent[]>([]);
   const [highlightedAgentId, setHighlightedAgentId] = useState<string>();
   const [delegationLinks, setDelegationLinks] = useState<DelegationLink[]>([]);
+  const [toolPulses, setToolPulses] = useState<ToolUsePulse[]>([]);
 
   useEffect(() => {
     const eventSource = new EventSource("/api/office/events");
@@ -41,6 +53,10 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
             a.id === event.agentId ? { ...a, status: newStatus } : a
           )
         );
+      }
+
+      if (event.type === "AGENT_COMPLETED") {
+        markCelebrating(event.agentId);
       }
 
       if (event.type === "AGENT_DELEGATED" && event.message) {
@@ -67,6 +83,27 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
           });
         }
       }
+
+      if (event.type === "AGENT_TOOL_USED" && event.departmentSlug) {
+        setAgents((current) => {
+          const agent = current.find((a) => a.id === event.agentId);
+          if (!agent) return current;
+          setToolPulses((pulses) =>
+            [
+              {
+                id: `${event.agentId}-${Date.now()}`,
+                agentId: event.agentId,
+                departmentSlug: event.departmentSlug!,
+                color: agent.department.color,
+                agentPosition: [0, 0.5, 0] as [number, number, number],
+                timestamp: Date.now(),
+              },
+              ...pulses,
+            ].slice(0, 12)
+          );
+          return current;
+        });
+      }
     };
 
     return () => eventSource.close();
@@ -91,6 +128,7 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
     const interval = setInterval(() => {
       const cutoff = Date.now() - 8000;
       setDelegationLinks((links) => links.filter((l) => l.timestamp > cutoff));
+      setToolPulses((pulses) => pulses.filter((p) => p.timestamp > cutoff - 2000));
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -100,5 +138,6 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
     events,
     highlightedAgentId,
     delegationLinks,
+    toolPulses,
   };
 }

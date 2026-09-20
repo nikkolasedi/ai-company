@@ -253,6 +253,7 @@ async function runStep(
 ) {
   const agent = await db.agent.findUniqueOrThrow({
     where: { id: step.agentId },
+    include: { department: true },
   });
 
   const task = await db.task.create({
@@ -290,6 +291,16 @@ async function runStep(
   await db.agent.update({
     where: { id: step.agentId },
     data: { status: AgentStatus.WORKING },
+  });
+
+  const mockTools = (agent.tools?.length ? agent.tools : ["search", "draft", "analyze"]) as string[];
+  const toolName = mockTools[Math.floor(Math.random() * mockTools.length)];
+  emit("AGENT_TOOL_USED", agent, organizationId, {
+    taskId: task.id,
+    taskTitle: step.title,
+    toolName,
+    departmentSlug: agent.department.slug,
+    message: `Used tool: ${toolName}`,
   });
 
   await delay(2000 + Math.random() * 2000);

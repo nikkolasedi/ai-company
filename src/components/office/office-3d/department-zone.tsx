@@ -14,23 +14,24 @@ import {
   regularHexagonPoints,
   ZONE_HEX_RADIUS,
 } from "@/lib/office/layout";
+import type { ToolUsePulse } from "@/hooks/use-office-live-data";
+import { ConnectorBeams } from "./connector-beams";
 import { OfficeChair, Plant, Workstation } from "./furniture";
-import { AgentCharacter } from "./agent-character";
 
 interface DepartmentZone3DProps {
   department: DepartmentWithAgents;
   agents: AgentWithDepartment[];
-  highlightedAgentId?: string;
   environmentStyle?: EnvironmentStyle;
-  avatarStyle?: AvatarStyle;
+  toolPulses?: ToolUsePulse[];
+  agentPositions?: Map<string, [number, number, number]>;
 }
 
 export function DepartmentZone3D({
   department,
   agents,
-  highlightedAgentId,
   environmentStyle = "C",
-  avatarStyle = "B",
+  toolPulses = [],
+  agentPositions,
 }: DepartmentZone3DProps) {
   const router = useRouter();
   const zoneCenter = getDepartmentZoneCenter(department.slug);
@@ -135,10 +136,6 @@ export function DepartmentZone3D({
 
       {agents.slice(0, 6).map((agent, i) => {
         const desk = getDeskWorldTransform(zoneCenter, i);
-        const agentFacingOffset = 0.04;
-        const agentX = desk.chairPosition[0] - agentFacingOffset * Math.sin(desk.rotation);
-        const agentZ = desk.chairPosition[2] - agentFacingOffset * Math.cos(desk.rotation);
-
         return (
           <group key={agent.id}>
             <Workstation
@@ -152,16 +149,19 @@ export function DepartmentZone3D({
               rotation={desk.chairRotation}
               environmentStyle={environmentStyle}
             />
-            <AgentCharacter
-              agent={agent}
-              position={[agentX, 0.2, agentZ]}
-              rotation={desk.chairRotation}
-              highlight={highlightedAgentId === agent.id}
-              avatarStyle={avatarStyle}
-            />
           </group>
         );
       })}
+
+      <ConnectorBeams
+        departmentSlug={department.slug}
+        departmentColor={department.color}
+        zoneCenter={zoneCenter}
+        pulses={toolPulses.map((p) => ({
+          ...p,
+          agentPosition: agentPositions?.get(p.agentId) ?? p.agentPosition,
+        }))}
+      />
 
       {plantPositions.map((pos, i) => (
         <Plant key={`plant-${i}`} position={pos} environmentStyle={environmentStyle} />
