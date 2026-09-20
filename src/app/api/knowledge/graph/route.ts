@@ -1,5 +1,5 @@
 import { auth } from "@/lib/auth";
-import { getConnectors, refreshMcpDiscovery } from "@/lib/orchestration/connectors";
+import { buildKnowledgeGraph } from "@/lib/knowledge/graph";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -8,7 +8,6 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  await refreshMcpDiscovery();
-  const connectors = await getConnectors(session.user.organizationId);
-  return NextResponse.json(connectors);
+  const graph = await buildKnowledgeGraph(session.user.organizationId);
+  return NextResponse.json(graph);
 }

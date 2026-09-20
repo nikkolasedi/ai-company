@@ -241,6 +241,25 @@ async function main() {
     },
   ];
 
+  await db.connector.create({
+    data: {
+      name: "MCP Policy",
+      provider: "mcp-policy",
+      status: "CONNECTED",
+      organizationId: org.id,
+      config: {
+        allow: [],
+        deny: [],
+        departments: {
+          gmail: ["sales", "customer-communication", "operations", "finance"],
+          slack: ["operations", "customer-communication", "technology"],
+          notion: ["marketing", "operations", "technology", "sales"],
+          hubspot: ["sales", "marketing"],
+        },
+      },
+    },
+  });
+
   for (const def of connectorDefs) {
     const connector = await db.connector.create({
       data: {
@@ -248,7 +267,20 @@ async function main() {
         provider: def.provider,
         status: "CONNECTED",
         organizationId: org.id,
-        config: { source: "seed", mcp: true },
+        config: {
+          source: "seed",
+          mcp: true,
+          departments:
+            def.provider === "gmail"
+              ? ["sales", "customer-communication", "operations", "finance"]
+              : def.provider === "slack"
+                ? ["operations", "customer-communication", "technology"]
+                : def.provider === "notion"
+                  ? ["marketing", "operations", "technology", "sales"]
+                  : def.provider === "hubspot"
+                    ? ["sales", "marketing"]
+                    : ["marketing", "sales", "operations"],
+        },
       },
     });
     for (const tool of def.tools) {

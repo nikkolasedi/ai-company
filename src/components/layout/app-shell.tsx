@@ -12,6 +12,7 @@ import {
   Sparkles,
   Menu,
   X,
+  Brain,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/command", label: "Command", icon: Sparkles },
   { href: "/approvals", label: "Approvals", icon: CheckCircle },
+  { href: "/brain", label: "Brain", icon: Brain },
 ];
 
 export function AppShell({

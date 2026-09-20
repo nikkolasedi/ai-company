@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { getDashboardStats } from "@/lib/data/queries";
 import { StatsGrid } from "@/components/dashboard/stats-grid";
+import { BrainGraph } from "@/components/knowledge/brain-graph";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatRelativeTime } from "@/lib/utils";
 import { redirect } from "next/navigation";
@@ -20,6 +21,18 @@ export default async function DashboardPage() {
       </div>
 
       <StatsGrid stats={stats} />
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Company Brain</CardTitle>
+          <Link href="/brain" className="text-xs text-indigo-400 hover:underline">
+            View full brain →
+          </Link>
+        </CardHeader>
+        <CardContent>
+          <BrainGraph height={260} />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

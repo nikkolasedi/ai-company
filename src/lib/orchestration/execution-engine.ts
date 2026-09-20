@@ -5,7 +5,7 @@ import { officeEventEmitter } from "@/lib/events/emitter";
 import type { ExecutionPlan, ExecutionPlanStep, OfficeEvent } from "@/types";
 import { buildAgentSystemPrompt } from "./prompt-builder";
 import { routeTask } from "./router";
-import { executeTool, getAllowedTools } from "./connectors";
+import { executeTool, getAllowedTools, refreshMcpDiscovery } from "./connectors";
 import { waitForApproval, resolveApproval } from "./approval-gate";
 import { skillNamesForAgent } from "./skills";
 
@@ -199,6 +199,8 @@ function buildFallbackPlan(agents: AgentWithDept[], goal: string): ExecutionPlan
 export async function startExecution(executionId: string): Promise<void> {
   if (runningExecutions.has(executionId)) return;
   runningExecutions.add(executionId);
+
+  await refreshMcpDiscovery();
 
   const execution = await db.execution.findUniqueOrThrow({
     where: { id: executionId },
