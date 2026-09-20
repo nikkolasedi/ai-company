@@ -10,7 +10,13 @@ import type { DelegationLink } from "@/hooks/use-office-live-data";
 import type { AvatarStyle, EnvironmentStyle } from "@/lib/office/visual-styles";
 import { DEFAULT_AVATAR_STYLE, DEFAULT_ENVIRONMENT_STYLE } from "@/lib/office/visual-styles";
 import { position2dTo3d, SCENE_CENTER } from "@/lib/office/coordinates";
-import { getDepartmentZoneCenter, getDeskWorldTransform } from "@/lib/office/layout";
+import {
+  getDepartmentZoneCenter,
+  getDeskWorldTransform,
+  hubHexRingPoints,
+  HUB_CLEAR_RADIUS,
+  regularHexagonPoints,
+} from "@/lib/office/layout";
 import { AgentCharacter } from "./agent-character";
 import { DelegationLine } from "./delegation-line";
 import { DepartmentZone3D } from "./department-zone";
@@ -134,13 +140,30 @@ function SceneContent({
         enableZoom
         minPolarAngle={Math.PI / 8}
         maxPolarAngle={Math.PI / 2.5}
-        minDistance={7}
-        maxDistance={32}
+        minDistance={8}
+        maxDistance={36}
         target={SCENE_CENTER}
         enableDamping
         dampingFactor={0.08}
       />
       <Environment3D style={environmentStyle} />
+
+      <Line
+        points={[...hubHexRingPoints(), hubHexRingPoints()[0]]}
+        color={envTheme.hubTableColor}
+        lineWidth={1.2}
+        transparent
+        opacity={0.25}
+      />
+      <Line
+        points={regularHexagonPoints(HUB_CLEAR_RADIUS).map(
+          ([x, y, z]) => [meetingX + x, 0.035, meetingZ + z] as [number, number, number]
+        )}
+        color={envTheme.hubTableColor}
+        lineWidth={1.5}
+        transparent
+        opacity={0.4}
+      />
 
       <HubConnectionLines
         departments={departments}

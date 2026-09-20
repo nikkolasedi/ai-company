@@ -21,8 +21,8 @@ export function Workstation({
 
   return (
     <group position={position} rotation={[0, rotation, 0]}>
-      <mesh position={[-0.15, DESK_HEIGHT, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.9, 0.04, 0.55]} />
+      <mesh position={[-0.14, DESK_HEIGHT, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.82, 0.04, 0.5]} />
         <meshStandardMaterial
           color={theme.deskTop}
           emissive={theme.deskEmissive}
@@ -31,8 +31,8 @@ export function Workstation({
           metalness={isCyber ? 0.45 : isCorporate ? 0.05 : 0.02}
         />
       </mesh>
-      <mesh position={[0.35, DESK_HEIGHT, -0.2]} castShadow receiveShadow>
-        <boxGeometry args={[0.4, 0.04, 0.35]} />
+      <mesh position={[0.32, DESK_HEIGHT, -0.18]} castShadow receiveShadow>
+        <boxGeometry args={[0.36, 0.04, 0.32]} />
         <meshStandardMaterial
           color={theme.deskTop}
           emissive={theme.deskEmissive}

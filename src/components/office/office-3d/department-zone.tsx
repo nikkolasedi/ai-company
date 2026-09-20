@@ -7,7 +7,13 @@ import * as THREE from "three";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import type { AvatarStyle, EnvironmentStyle } from "@/lib/office/visual-styles";
 import { ENVIRONMENT_THEMES } from "@/lib/office/visual-styles";
-import { getDepartmentZoneCenter, getDeskWorldTransform, getFacingHubRotation } from "@/lib/office/layout";
+import {
+  getDepartmentZoneCenter,
+  getDeskWorldTransform,
+  getFacingHubRotation,
+  regularHexagonPoints,
+  ZONE_HEX_RADIUS,
+} from "@/lib/office/layout";
 import { OfficeChair, Plant, Workstation } from "./furniture";
 import { AgentCharacter } from "./agent-character";
 
@@ -17,23 +23,6 @@ interface DepartmentZone3DProps {
   highlightedAgentId?: string;
   environmentStyle?: EnvironmentStyle;
   avatarStyle?: AvatarStyle;
-}
-
-const ZONE_WIDTH = 4.6;
-const ZONE_DEPTH = 2.4;
-
-function hexPoints(w: number, d: number): [number, number, number][] {
-  const hw = w / 2;
-  const hd = d / 2;
-  return [
-    [-hw * 0.55, 0, -hd],
-    [hw * 0.55, 0, -hd],
-    [hw, 0, 0],
-    [hw * 0.55, 0, hd],
-    [-hw * 0.55, 0, hd],
-    [-hw, 0, 0],
-    [-hw * 0.55, 0, -hd],
-  ];
 }
 
 export function DepartmentZone3D({
@@ -51,46 +40,37 @@ export function DepartmentZone3D({
 
   const hexShape = useMemo(() => {
     const shape = new THREE.Shape();
-    const hw = ZONE_WIDTH / 2;
-    const hd = ZONE_DEPTH / 2;
-    shape.moveTo(-hw * 0.55, -hd);
-    shape.lineTo(hw * 0.55, -hd);
-    shape.lineTo(hw, 0);
-    shape.lineTo(hw * 0.55, hd);
-    shape.lineTo(-hw * 0.55, hd);
-    shape.lineTo(-hw, 0);
+    const pts = regularHexagonPoints(ZONE_HEX_RADIUS);
+    shape.moveTo(pts[0][0], pts[0][2]);
+    for (let i = 1; i < pts.length; i++) {
+      shape.lineTo(pts[i][0], pts[i][2]);
+    }
     shape.closePath();
     return shape;
   }, []);
 
-  const borderPoints = useMemo(() => hexPoints(ZONE_WIDTH, ZONE_DEPTH), []);
+  const borderPoints = useMemo(() => regularHexagonPoints(ZONE_HEX_RADIUS), []);
 
-  const labelOffsetZ = -ZONE_DEPTH / 2 + 0.2;
-  const labelX = cx + labelOffsetZ * Math.sin(facing);
-  const labelZ = cz + labelOffsetZ * Math.cos(facing);
+  const labelDist = ZONE_HEX_RADIUS + 0.15;
+  const labelX = cx + labelDist * Math.sin(facing);
+  const labelZ = cz + labelDist * Math.cos(facing);
 
+  const plantAngle = facing + Math.PI / 3;
   const plantPositions = useMemo(() => {
     const positions: [number, number, number][] = [];
-    const offsets = [
-      { lx: ZONE_WIDTH / 2 - 0.35, lz: ZONE_DEPTH / 2 - 0.25 },
-      { lx: -ZONE_WIDTH / 2 + 0.35, lz: ZONE_DEPTH / 2 - 0.25 },
-    ];
+    const dist = ZONE_HEX_RADIUS + 0.2;
     for (let i = 0; i < theme.plantsPerZone; i++) {
-      const o = offsets[i % offsets.length];
-      positions.push([
-        cx + o.lx * Math.cos(facing) - o.lz * Math.sin(facing),
-        0,
-        cz + o.lx * Math.sin(facing) + o.lz * Math.cos(facing),
-      ]);
+      const a = plantAngle + i * (Math.PI / 2);
+      positions.push([cx + dist * Math.sin(a), 0, cz + dist * Math.cos(a)]);
     }
     return positions;
-  }, [cx, cz, facing, theme.plantsPerZone]);
+  }, [cx, cz, plantAngle, theme.plantsPerZone]);
 
   return (
     <group>
       <mesh
-        position={[cx, 0.015, cz]}
-        rotation={[-Math.PI / 2, facing, 0]}
+        position={[cx, 0.012, cz]}
+        rotation={[-Math.PI / 2, 0, 0]}
         receiveShadow
         onClick={() => router.push(`/departments/${department.slug}`)}
         onPointerOver={() => {
@@ -110,44 +90,40 @@ export function DepartmentZone3D({
           roughness={environmentStyle === "B" ? 0.3 : 0.85}
           metalness={environmentStyle === "B" ? 0.2 : 0}
           side={THREE.DoubleSide}
+          depthWrite={false}
         />
       </mesh>
 
-      <group position={[cx, 0.03, cz]} rotation={[0, facing, 0]}>
-        <Line
-          points={borderPoints}
-          color={department.color}
-          lineWidth={theme.zoneBorderWidth}
-          transparent
-          opacity={theme.zoneBorderOpacity}
-        />
-      </group>
+      <Line
+        points={borderPoints.map(([x, y, z]) => [cx + x, 0.025, cz + z] as [number, number, number])}
+        color={department.color}
+        lineWidth={theme.zoneBorderWidth}
+        transparent
+        opacity={theme.zoneBorderOpacity}
+      />
 
       {environmentStyle === "B" && (
-        <group position={[cx, 0.04, cz]} rotation={[0, facing, 0]}>
-          <Line
-            points={borderPoints.map(([x, y, z]) => [x * 0.92, y, z * 0.92] as [number, number, number])}
-            color="#ffffff"
-            lineWidth={0.8}
-            transparent
-            opacity={0.25}
-          />
-        </group>
+        <Line
+          points={borderPoints.map(([x, y, z]) => [
+            cx + x * 0.88,
+            0.03,
+            cz + z * 0.88,
+          ] as [number, number, number])}
+          color="#ffffff"
+          lineWidth={0.6}
+          transparent
+          opacity={0.2}
+        />
       )}
 
-      <Html
-        position={[labelX, 0.5, labelZ]}
-        center
-        distanceFactor={12}
-        style={{ pointerEvents: "none" }}
-      >
+      <Html position={[labelX, 0.55, labelZ]} center distanceFactor={13} style={{ pointerEvents: "none" }}>
         <div
           className="select-none whitespace-nowrap rounded-md px-2 py-0.5 text-center"
           style={{
-            fontSize: "10px",
+            fontSize: "9px",
             fontWeight: 700,
             color: department.color,
-            letterSpacing: "1.2px",
+            letterSpacing: "1px",
             textTransform: "uppercase",
             background: theme.labelBg,
             textShadow: theme.labelUseGlow ? `0 0 10px ${department.color}` : "none",
@@ -159,7 +135,7 @@ export function DepartmentZone3D({
 
       {agents.slice(0, 6).map((agent, i) => {
         const desk = getDeskWorldTransform(zoneCenter, i);
-        const agentFacingOffset = 0.05;
+        const agentFacingOffset = 0.04;
         const agentX = desk.chairPosition[0] - agentFacingOffset * Math.sin(desk.rotation);
         const agentZ = desk.chairPosition[2] - agentFacingOffset * Math.cos(desk.rotation);
 
