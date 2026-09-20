@@ -6,17 +6,25 @@ import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import type { Group } from "three";
 import type { AgentWithDepartment } from "@/types";
+import type { AvatarStyle } from "@/lib/office/visual-styles";
 import { generateAvatarColor } from "@/lib/office/avatar-color";
 import { STATUS_COLORS } from "@/lib/office/status-colors";
+import { AvatarMesh } from "./avatars";
 import { ThinkingIndicator } from "./thinking-indicator";
 
 interface AgentCharacterProps {
   agent: AgentWithDepartment;
   position: [number, number, number];
   highlight?: boolean;
+  avatarStyle?: AvatarStyle;
 }
 
-export function AgentCharacter({ agent, position, highlight }: AgentCharacterProps) {
+export function AgentCharacter({
+  agent,
+  position,
+  highlight,
+  avatarStyle = "B",
+}: AgentCharacterProps) {
   const router = useRouter();
   const groupRef = useRef<Group>(null);
   const bodyRef = useRef<Group>(null);
@@ -63,14 +71,7 @@ export function AgentCharacter({ agent, position, highlight }: AgentCharacterPro
       }}
     >
       <group ref={bodyRef}>
-        <mesh position={[0, 0.35, 0]} castShadow>
-          <capsuleGeometry args={[0.15, 0.4, 8, 16]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
-        <mesh position={[0, 0.7, 0]} castShadow>
-          <sphereGeometry args={[0.12, 16, 16]} />
-          <meshStandardMaterial color={color} />
-        </mesh>
+        <AvatarMesh color={color} style={avatarStyle} />
       </group>
 
       {agent.status === "THINKING" && <ThinkingIndicator />}

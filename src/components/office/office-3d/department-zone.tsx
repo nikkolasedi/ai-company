@@ -3,6 +3,8 @@
 import { Html } from "@react-three/drei";
 import { useRouter } from "next/navigation";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
+import type { AvatarStyle, EnvironmentStyle } from "@/lib/office/visual-styles";
+import { ENVIRONMENT_THEMES } from "@/lib/office/visual-styles";
 import { agentWorldPosition, departmentCenter } from "@/lib/office/coordinates";
 import { OfficeChair, Plant, Workstation } from "./furniture";
 import { AgentCharacter } from "./agent-character";
@@ -11,6 +13,8 @@ interface DepartmentZone3DProps {
   department: DepartmentWithAgents;
   agents: AgentWithDepartment[];
   highlightedAgentId?: string;
+  environmentStyle?: EnvironmentStyle;
+  avatarStyle?: AvatarStyle;
 }
 
 const DESK_LAYOUTS: Array<{ deskX: number; deskY: number; rot: number }> = [
@@ -26,11 +30,14 @@ export function DepartmentZone3D({
   department,
   agents,
   highlightedAgentId,
+  environmentStyle = "C",
+  avatarStyle = "B",
 }: DepartmentZone3DProps) {
   const router = useRouter();
   const [cx, , cz] = departmentCenter(department.officeX, department.officeY);
   const zoneWidth = 5.2;
   const zoneDepth = 2.8;
+  const theme = ENVIRONMENT_THEMES[environmentStyle];
 
   return (
     <group>
@@ -49,9 +56,22 @@ export function DepartmentZone3D({
         <planeGeometry args={[zoneWidth, zoneDepth]} />
         <meshStandardMaterial
           color={department.color}
+          emissive={department.color}
+          emissiveIntensity={theme.zoneEmissive}
           transparent
-          opacity={0.18}
+          opacity={theme.zoneOpacity}
           roughness={0.85}
+        />
+      </mesh>
+
+      <mesh position={[cx, 0.02, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+        <ringGeometry args={[zoneWidth / 2 - 0.06, zoneWidth / 2, 4]} />
+        <meshStandardMaterial
+          color={department.color}
+          emissive={department.color}
+          emissiveIntensity={theme.zoneEmissive * 1.5}
+          transparent
+          opacity={0.55}
         />
       </mesh>
 
@@ -97,6 +117,7 @@ export function DepartmentZone3D({
               agent={agent}
               position={[wx, 0, wz + chairOffset * 0.5]}
               highlight={highlightedAgentId === agent.id}
+              avatarStyle={avatarStyle}
             />
           </group>
         );

@@ -7,36 +7,40 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import type { DelegationLink } from "@/hooks/use-office-live-data";
+import type { AvatarStyle, EnvironmentStyle } from "@/lib/office/visual-styles";
+import { DEFAULT_AVATAR_STYLE, DEFAULT_ENVIRONMENT_STYLE } from "@/lib/office/visual-styles";
 import { agentWorldPosition, position2dTo3d, SCENE_CENTER } from "@/lib/office/coordinates";
 import { AgentCharacter } from "./agent-character";
 import { DelegationLine } from "./delegation-line";
 import { DepartmentZone3D } from "./department-zone";
-import { Environment3D } from "./environment";
+import { Environment3D, getEnvironmentBackground, getEnvironmentBloom } from "./environment";
 import { MeetingTable, Plant } from "./furniture";
 
-const BG_COLOR = new THREE.Color("#0f1729");
+function BackgroundSync({ background }: { background: string }) {
+  const { gl } = useThree();
+  const targetColor = useMemo(() => new THREE.Color(background), [background]);
+  const colorRef = useRef(targetColor.clone());
+
+  useEffect(() => {
+    colorRef.current.copy(targetColor);
+    gl.setClearColor(colorRef.current);
+  }, [gl, targetColor]);
+
+  useFrame(() => {
+    colorRef.current.lerp(targetColor, 0.05);
+    gl.setClearColor(colorRef.current);
+  });
+
+  return null;
+}
 
 interface OfficeScene3DProps {
   departments: DepartmentWithAgents[];
   agents: AgentWithDepartment[];
   highlightedAgentId?: string;
   delegationLinks: DelegationLink[];
-}
-
-function BackgroundSync() {
-  const { gl } = useThree();
-  const colorRef = useRef(BG_COLOR.clone());
-
-  useEffect(() => {
-    gl.setClearColor(colorRef.current);
-  }, [gl]);
-
-  useFrame(() => {
-    colorRef.current.lerp(BG_COLOR, 0.05);
-    gl.setClearColor(colorRef.current);
-  });
-
-  return null;
+  environmentStyle?: EnvironmentStyle;
+  avatarStyle?: AvatarStyle;
 }
 
 function SceneContent({
@@ -44,6 +48,8 @@ function SceneContent({
   agents,
   highlightedAgentId,
   delegationLinks,
+  environmentStyle = DEFAULT_ENVIRONMENT_STYLE,
+  avatarStyle = DEFAULT_AVATAR_STYLE,
 }: OfficeScene3DProps) {
   const ceoAgent = agents.find((a) => a.isOrchestrator);
   const [meetingX, , meetingZ] = position2dTo3d({ x: 450, y: 350 });
@@ -62,9 +68,11 @@ function SceneContent({
     return map;
   }, [agents, departments]);
 
+  const bloomIntensity = getEnvironmentBloom(environmentStyle);
+
   return (
     <>
-      <BackgroundSync />
+      <BackgroundSync background={getEnvironmentBackground(environmentStyle)} />
       <OrbitControls
         enableRotate
         enablePan
@@ -77,7 +85,7 @@ function SceneContent({
         enableDamping
         dampingFactor={0.08}
       />
-      <Environment3D />
+      <Environment3D style={environmentStyle} />
 
       {departments.map((dept) => (
         <DepartmentZone3D
@@ -85,6 +93,8 @@ function SceneContent({
           department={dept}
           agents={agents.filter((a) => a.department.slug === dept.slug && !a.isOrchestrator)}
           highlightedAgentId={highlightedAgentId}
+          environmentStyle={environmentStyle}
+          avatarStyle={avatarStyle}
         />
       ))}
 
@@ -100,6 +110,7 @@ function SceneContent({
           agent={ceoAgent}
           position={[meetingX, 0, meetingZ + 0.6]}
           highlight={highlightedAgentId === ceoAgent.id}
+          avatarStyle={avatarStyle}
         />
       )}
 
@@ -120,7 +131,12 @@ function SceneContent({
       })}
 
       <EffectComposer>
-        <Bloom intensity={0.8} luminanceThreshold={0.6} luminanceSmoothing={0.4} mipmapBlur />
+        <Bloom
+          intensity={bloomIntensity}
+          luminanceThreshold={0.6}
+          luminanceSmoothing={0.4}
+          mipmapBlur
+        />
       </EffectComposer>
     </>
   );

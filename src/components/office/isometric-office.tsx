@@ -5,9 +5,11 @@ import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import { useOfficeLiveData } from "@/hooks/use-office-live-data";
+import { useOfficeVisualStyle } from "@/hooks/use-office-visual-style";
 import { Badge } from "@/components/ui/badge";
 import { LiveActivityPanel } from "./live-activity-panel";
 import { Office2DView } from "./office-2d-view";
+import { StyleSwitcher } from "./style-switcher";
 import { ViewModeSwitch, type OfficeViewMode } from "./view-mode-switch";
 
 const OfficeScene3D = dynamic(
@@ -38,6 +40,12 @@ function Scene3DFallback() {
 export function IsometricOffice({ departments, initialAgents }: IsometricOfficeProps) {
   const { agents, events, highlightedAgentId, delegationLinks } =
     useOfficeLiveData(initialAgents);
+  const {
+    environmentStyle,
+    avatarStyle,
+    setEnvironmentStyle,
+    setAvatarStyle,
+  } = useOfficeVisualStyle();
   const [viewMode, setViewMode] = useState<OfficeViewMode>("3d");
   const [displayMode, setDisplayMode] = useState<OfficeViewMode>("3d");
   const [webglAvailable, setWebglAvailable] = useState(true);
@@ -76,7 +84,15 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
                 : "Tap departments or agents to explore"}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-end gap-2 sm:gap-3">
+            {displayMode === "3d" && (
+              <StyleSwitcher
+                environmentStyle={environmentStyle}
+                avatarStyle={avatarStyle}
+                onEnvironmentChange={setEnvironmentStyle}
+                onAvatarChange={setAvatarStyle}
+              />
+            )}
             <ViewModeSwitch
               viewMode={viewMode}
               onChange={setViewMode}
@@ -111,6 +127,8 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
                 agents={agents}
                 highlightedAgentId={highlightedAgentId}
                 delegationLinks={delegationLinks}
+                environmentStyle={environmentStyle}
+                avatarStyle={avatarStyle}
               />
             </Suspense>
           )}
