@@ -11,7 +11,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       organizationName={session.user.organizationName}
       userName={session.user.name}
     >
-      <div className="p-6">{children}</div>
+      <div className="p-3 sm:p-4 lg:p-6">{children}</div>
     </AppShell>
   );
 }

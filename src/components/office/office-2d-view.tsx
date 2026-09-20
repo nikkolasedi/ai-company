@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -155,29 +155,36 @@ export function Office2DView({
   highlightedAgentId,
 }: Office2DViewProps) {
   return (
-    <div className="relative mx-auto" style={{ width: 900, height: 700 }}>
-      <svg className="absolute inset-0 opacity-20" width="900" height="700">
-        {Array.from({ length: 20 }).map((_, i) => (
-          <line
-            key={`h-${i}`}
-            x1="0"
-            y1={i * 35}
-            x2="900"
-            y2={i * 35}
-            stroke="#3f3f46"
-            strokeWidth="0.5"
-          />
-        ))}
-      </svg>
+    <div className="flex h-full min-h-[320px] items-start justify-center overflow-auto">
+      <div
+        className="origin-top scale-[0.42] sm:scale-[0.55] md:scale-[0.72] lg:scale-100"
+        style={{ width: 900, height: 700 }}
+      >
+        <div className="relative" style={{ width: 900, height: 700 }}>
+          <svg className="absolute inset-0 opacity-20" width="900" height="700">
+            {Array.from({ length: 20 }).map((_, i) => (
+              <line
+                key={`h-${i}`}
+                x1="0"
+                y1={i * 35}
+                x2="900"
+                y2={i * 35}
+                stroke="#3f3f46"
+                strokeWidth="0.5"
+              />
+            ))}
+          </svg>
 
-      {departments.map((dept) => (
-        <DepartmentZone
-          key={dept.id}
-          department={dept}
-          agents={agents.filter((a) => a.department.slug === dept.slug)}
-          highlightedAgentId={highlightedAgentId}
-        />
-      ))}
+          {departments.map((dept) => (
+            <DepartmentZone
+              key={dept.id}
+              department={dept}
+              agents={agents.filter((a) => a.department.slug === dept.slug)}
+              highlightedAgentId={highlightedAgentId}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

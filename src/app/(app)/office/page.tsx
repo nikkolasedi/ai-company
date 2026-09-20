@@ -13,7 +13,7 @@ export default async function OfficePage() {
   ]);
 
   return (
-    <div className="h-[calc(100vh-3rem)]">
+    <div className="flex h-[calc(100dvh-3.5rem)] min-h-0 flex-col lg:h-[calc(100dvh-3rem)]">
       <IsometricOffice departments={departments} initialAgents={agents} />
     </div>
   );

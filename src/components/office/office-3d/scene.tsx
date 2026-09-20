@@ -128,7 +128,7 @@ function SceneContent({
 
 export function OfficeScene3D(props: OfficeScene3DProps) {
   return (
-    <div className="h-full w-full min-h-[500px]">
+    <div className="h-full w-full min-h-[240px]">
       <Canvas
         gl={{ antialias: true, alpha: false }}
         shadows

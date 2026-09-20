@@ -15,7 +15,7 @@ const OfficeScene3D = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-full min-h-[500px] items-center justify-center text-sm text-zinc-500">
+      <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-zinc-500">
         Loading 3D scene...
       </div>
     ),
@@ -29,7 +29,7 @@ interface IsometricOfficeProps {
 
 function Scene3DFallback() {
   return (
-    <div className="flex h-full min-h-[500px] items-center justify-center text-sm text-zinc-500">
+    <div className="flex h-full min-h-[240px] items-center justify-center text-sm text-zinc-500">
       Loading 3D scene...
     </div>
   );
@@ -65,18 +65,18 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
   const ceoAgent = agents.find((a) => a.isOrchestrator);
 
   return (
-    <div className="flex h-full gap-4">
-      <div className="relative flex flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold">Virtual Office</h2>
-            <p className="text-sm text-zinc-400">
+    <div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row lg:gap-4">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-3 sm:p-4 lg:p-6">
+        <div className="mb-3 flex shrink-0 flex-col gap-3 sm:mb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold sm:text-xl">Virtual Office</h2>
+            <p className="text-xs text-zinc-400 sm:text-sm">
               {displayMode === "3d"
-                ? "Drag to orbit · Scroll to zoom · Click agents to explore"
-                : "Click departments or agents to explore"}
+                ? "Drag to orbit · Pinch to zoom · Tap agents to explore"
+                : "Tap departments or agents to explore"}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <ViewModeSwitch
               viewMode={viewMode}
               onChange={setViewMode}
@@ -85,17 +85,17 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
             {ceoAgent && (
               <Link
                 href={`/agents/${ceoAgent.id}`}
-                className="flex items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm"
+                className="flex min-w-0 items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-sm sm:px-4 sm:py-2"
               >
                 <span className="font-medium text-indigo-300">CEO</span>
-                <span className="text-zinc-400">{ceoAgent.name}</span>
+                <span className="hidden truncate text-zinc-400 sm:inline">{ceoAgent.name}</span>
                 <Badge status={ceoAgent.status} />
               </Link>
             )}
           </div>
         </div>
 
-        <div className="relative min-h-0 flex-1 overflow-hidden">
+        <div className="relative min-h-[38dvh] flex-1 overflow-hidden sm:min-h-[42dvh] lg:min-h-0">
           {displayMode === "2d" ? (
             <div className="h-full overflow-auto">
               <Office2DView
