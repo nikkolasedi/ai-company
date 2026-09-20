@@ -1,0 +1,379 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum AgentStatus {
+  IDLE
+  THINKING
+  WORKING
+  WAITING_APPROVAL
+  DELEGATING
+  FAILED
+  OFFLINE
+}
+
+enum TaskStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  AWAITING_APPROVAL
+}
+
+enum PermissionLevel {
+  READ
+  DRAFT
+  EXECUTE
+  EXECUTE_WITH_APPROVAL
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ExecutionStatus {
+  PLANNED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum GoalStatus {
+  DRAFT
+  PLANNED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum ConnectorStatus {
+  DISCONNECTED
+  CONNECTED
+  ERROR
+}
+
+enum KnowledgeSourceType {
+  PDF
+  DOCX
+  TXT
+  CSV
+  URL
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  memberships Membership[]
+  departments Department[]
+  agents      Agent[]
+  goals       Goal[]
+  workflows   Workflow[]
+  tasks       Task[]
+  executions  Execution[]
+  messages    Message[]
+  approvals   Approval[]
+  auditLogs   AuditLog[]
+  knowledgeDocuments KnowledgeDocument[]
+  knowledgeSources   KnowledgeSource[]
+  connectors  Connector[]
+  tools       Tool[]
+  agentMemories AgentMemory[]
+  agentMetrics  AgentMetric[]
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String?
+  passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  memberships  Membership[]
+  auditLogs    AuditLog[]
+  approvals    Approval[]   @relation("ApprovalReviewer")
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  role           MembershipRole @default(MEMBER)
+  userId         String
+  organizationId String
+  createdAt      DateTime       @default(now())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  name           String
+  slug           String
+  color          String
+  description    String?
+  officeX        Float    @default(0)
+  officeY        Float    @default(0)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agents         Agent[]
+
+  @@unique([organizationId, slug])
+}
+
+model AgentRole {
+  id               String   @id @default(cuid())
+  name             String   @unique
+  description      String?
+  defaultInstructions String?
+  createdAt        DateTime @default(now())
+  agents           Agent[]
+}
+
+model Agent {
+  id               String          @id @default(cuid())
+  name             String
+  role             String
+  title            String?
+  avatar           String?
+  status           AgentStatus     @default(IDLE)
+  systemInstructions String?
+  model            String          @default("mock-gpt-4")
+  tools            String[]        @default([])
+  connectors       String[]        @default([])
+  permissions      PermissionLevel @default(READ)
+  knowledgeSources String[]        @default([])
+  deskX            Float           @default(0)
+  deskY            Float           @default(0)
+  isOrchestrator   Boolean         @default(false)
+  departmentId     String
+  agentRoleId      String?
+  organizationId   String
+  currentTaskId    String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  department       Department      @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  agentRole        AgentRole?      @relation(fields: [agentRoleId], references: [id])
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks            Task[]          @relation("AssignedAgent")
+  messages         Message[]
+  memories         AgentMemory[]
+  metrics          AgentMetric[]
+}
+
+model Goal {
+  id             String     @id @default(cuid())
+  title          String
+  description    String?
+  status         GoalStatus @default(DRAFT)
+  organizationId String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workflows      Workflow[]
+  executions     Execution[]
+}
+
+model Workflow {
+  id             String         @id @default(cuid())
+  name           String
+  description    String?
+  status         WorkflowStatus @default(DRAFT)
+  goalId         String?
+  organizationId String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  goal           Goal?          @relation(fields: [goalId], references: [id])
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tasks          Task[]
+  executions     Execution[]
+}
+
+model Task {
+  id             String     @id @default(cuid())
+  title          String
+  description    String?
+  status         TaskStatus @default(PENDING)
+  priority       Int        @default(0)
+  estimatedCost  Float?
+  estimatedMinutes Int?
+  result         String?
+  organizationId String
+  workflowId     String?
+  assignedAgentId String?
+  executionId    String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  completedAt    DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  workflow       Workflow?    @relation(fields: [workflowId], references: [id])
+  assignedAgent  Agent?       @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+  execution      Execution?   @relation(fields: [executionId], references: [id])
+  messages       Message[]
+  approvals      Approval[]
+}
+
+model Execution {
+  id             String          @id @default(cuid())
+  planJson       Json?
+  status         ExecutionStatus @default(PLANNED)
+  estimatedCost  Float?
+  estimatedMinutes Int?
+  actualCost     Float?
+  organizationId String
+  goalId         String?
+  workflowId     String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  completedAt    DateTime?
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  goal           Goal?           @relation(fields: [goalId], references: [id])
+  workflow       Workflow?       @relation(fields: [workflowId], references: [id])
+  tasks          Task[]
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  content        String
+  role           String
+  metadata       Json?
+  organizationId String
+  agentId        String?
+  taskId         String?
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agent          Agent?       @relation(fields: [agentId], references: [id])
+  task           Task?        @relation(fields: [taskId], references: [id])
+}
+
+model Approval {
+  id             String         @id @default(cuid())
+  title          String
+  description    String?
+  status         ApprovalStatus @default(PENDING)
+  actionType     String
+  payload        Json?
+  organizationId String
+  taskId         String?
+  reviewerId     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  task           Task?          @relation(fields: [taskId], references: [id])
+  reviewer       User?          @relation("ApprovalReviewer", fields: [reviewerId], references: [id])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  action         String
+  resource       String
+  resourceId     String?
+  metadata       Json?
+  organizationId String
+  userId         String?
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation(fields: [userId], references: [id])
+}
+
+model KnowledgeDocument {
+  id             String   @id @default(cuid())
+  title          String
+  content        String?
+  filePath       String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sources        KnowledgeSource[]
+}
+
+model KnowledgeSource {
+  id             String              @id @default(cuid())
+  name           String
+  type           KnowledgeSourceType
+  url            String?
+  documentId     String?
+  organizationId String
+  createdAt      DateTime            @default(now())
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document       KnowledgeDocument?  @relation(fields: [documentId], references: [id])
+}
+
+model Connector {
+  id             String          @id @default(cuid())
+  name           String
+  provider       String
+  status         ConnectorStatus @default(DISCONNECTED)
+  config         Json?
+  organizationId String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  tools          Tool[]
+
+  @@unique([organizationId, provider])
+}
+
+model Tool {
+  id             String          @id @default(cuid())
+  name           String
+  description    String?
+  permission     PermissionLevel @default(READ)
+  connectorId    String?
+  organizationId String
+  createdAt      DateTime        @default(now())
+  connector      Connector?      @relation(fields: [connectorId], references: [id])
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model AgentMemory {
+  id             String   @id @default(cuid())
+  content        String
+  type           String   @default("task")
+  agentId        String
+  organizationId String
+  createdAt      DateTime @default(now())
+  agent          Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model AgentMetric {
+  id             String   @id @default(cuid())
+  metric         String
+  value          Float
+  agentId        String
+  organizationId String
+  recordedAt     DateTime @default(now())
+  agent          Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}

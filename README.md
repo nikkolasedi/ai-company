@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI Company OS
 
-## Getting Started
+A virtual AI workforce platform where business owners manage specialized AI agents through an interactive isometric office. The office is the navigation layer; orchestration, permissions, and connectors are the product underneath.
 
-First, run the development server:
+**Phase 1** delivers a fully functional demo with simulated agent execution — no external API keys required.
+
+## Demo Company
+
+**Nova Coffee GmbH** — Premium specialty coffee roaster and B2B supplier in Berlin.
+
+| | |
+|---|---|
+| Email | `ceo@novacoffee.demo` |
+| Password | `demo1234` |
+
+## Features (Phase 1)
+
+- Interactive isometric office with 6 departments and ~30 AI agents
+- Click departments and agents to navigate
+- Live agent status simulation via SSE events
+- Company dashboard with health metrics
+- Command center — submit business goals, get execution plans, start mock workflows
+- Approval center for sensitive actions
+- Full PostgreSQL schema ready for Phase 2+
+
+## Prerequisites
+
+- Node.js 20+
+- PostgreSQL 15+ (or Docker)
+
+## Quick Start
+
+### 1. Start PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+Or use an existing PostgreSQL instance and update `DATABASE_URL` accordingly.
+
+### 2. Configure environment
+
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` if needed. Generate a secret:
+
+```bash
+openssl rand -base64 32
+```
+
+### 3. Install and setup database
+
+```bash
+npm install
+npx prisma migrate dev --name init
+npx prisma db seed
+```
+
+### 4. Run the app
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) and sign in with the demo credentials.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+docs/           Product, architecture, agent system, security, roadmap
+prisma/         Database schema and seed data
+src/app/        Next.js pages and API routes
+src/components/ Office, dashboard, command center, UI
+src/lib/        Auth, DB, mock engine, events, RBAC
+```
 
-## Learn More
+## Documentation
 
-To learn more about Next.js, take a look at the following resources:
+- [Product Vision](docs/PRODUCT.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Agent System](docs/AGENT_SYSTEM.md)
+- [Security](docs/SECURITY.md)
+- [Roadmap](docs/ROADMAP.md)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Development Phases
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Phase | Focus |
+|---|---|
+| **1** (current) | Interactive office + simulated workforce |
+| 2 | Task engine + orchestrator + approvals |
+| 3 | Real AI provider + agent runtime |
+| 4 | Connectors / MCP |
+| 5 | Knowledge ingestion + memory |
+| 6 | Billing, SSO, production hardening |
 
-## Deploy on Vercel
+## Tech Stack
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 16, React 19, TypeScript
+- Tailwind CSS, Framer Motion
+- PostgreSQL, Prisma
+- NextAuth.js (credentials)
