@@ -1,44 +1,19 @@
 "use client";
 
-import { useState } from "react";
-import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useActionState } from "react";
 import { Building2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { loginAction } from "./actions";
 
 export default function LoginPage() {
-  const router = useRouter();
-  const [email, setEmail] = useState("ceo@novacoffee.demo");
-  const [password, setPassword] = useState("demo1234");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
-
-    try {
-      const result = await signIn("credentials", {
-        email,
-        password,
-        redirect: false,
-      });
-
-      if (!result || result.error) {
-        setError(result?.error ?? "Sign in failed. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      router.push("/office");
-      router.refresh();
-    } catch {
-      setError("Sign in failed. Please try again.");
-      setLoading(false);
-    }
-  }
+  const [state, formAction, pending] = useActionState(
+    async (_prev: { error?: string } | null, formData: FormData) => {
+      const result = await loginAction(formData);
+      return result ?? null;
+    },
+    null
+  );
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-indigo-950 p-4">
@@ -53,30 +28,38 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form action={formAction} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm text-zinc-400">Email</label>
+              <label className="mb-1.5 block text-sm text-zinc-400" htmlFor="email">
+                Email
+              </label>
               <input
+                id="email"
+                name="email"
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                defaultValue="ceo@novacoffee.demo"
+                autoComplete="email"
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none"
                 required
               />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm text-zinc-400">Password</label>
+              <label className="mb-1.5 block text-sm text-zinc-400" htmlFor="password">
+                Password
+              </label>
               <input
+                id="password"
+                name="password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                defaultValue="demo1234"
+                autoComplete="current-password"
                 className="w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none"
                 required
               />
             </div>
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
+            {state?.error && <p className="text-sm text-red-400">{state.error}</p>}
+            <Button type="submit" className="w-full" disabled={pending}>
+              {pending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Signing in...
