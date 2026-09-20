@@ -15,7 +15,7 @@ A virtual AI workforce platform where business owners manage specialized AI agen
 
 ## Features (Phase 1)
 
-- Interactive isometric office with 6 departments and ~30 AI agents
+- Interactive virtual office with 2D/3D views (ClawProwl-style R3F scene), 6 departments and ~30 AI agents
 - Click departments and agents to navigate
 - Live agent status simulation via SSE events
 - Company dashboard with health metrics
@@ -98,6 +98,6 @@ src/lib/        Auth, DB, mock engine, events, RBAC
 ## Tech Stack
 
 - Next.js 16, React 19, TypeScript
-- Tailwind CSS, Framer Motion
+- Tailwind CSS, Framer Motion, React Three Fiber
 - PostgreSQL, Prisma
 - NextAuth.js (credentials)
