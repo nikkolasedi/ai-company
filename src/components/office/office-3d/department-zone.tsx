@@ -7,7 +7,7 @@ import * as THREE from "three";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import type { AvatarStyle, EnvironmentStyle } from "@/lib/office/visual-styles";
 import { ENVIRONMENT_THEMES } from "@/lib/office/visual-styles";
-import { agentWorldPosition, departmentCenter } from "@/lib/office/coordinates";
+import { getDepartmentZoneCenter, getDeskWorldTransform, getFacingHubRotation } from "@/lib/office/layout";
 import { OfficeChair, Plant, Workstation } from "./furniture";
 import { AgentCharacter } from "./agent-character";
 
@@ -19,19 +19,13 @@ interface DepartmentZone3DProps {
   avatarStyle?: AvatarStyle;
 }
 
-const DESK_LAYOUTS: Array<{ deskX: number; deskY: number; rot: number }> = [
-  { deskX: 0, deskY: 0, rot: 0 },
-  { deskX: 60, deskY: 20, rot: 0 },
-  { deskX: 120, deskY: 0, rot: Math.PI },
-  { deskX: 180, deskY: 20, rot: Math.PI },
-  { deskX: 240, deskY: 0, rot: 0 },
-  { deskX: 300, deskY: 20, rot: Math.PI },
-];
+const ZONE_WIDTH = 4.6;
+const ZONE_DEPTH = 2.4;
 
 function hexPoints(w: number, d: number): [number, number, number][] {
   const hw = w / 2;
   const hd = d / 2;
-  const pts: [number, number, number][] = [
+  return [
     [-hw * 0.55, 0, -hd],
     [hw * 0.55, 0, -hd],
     [hw, 0, 0],
@@ -40,7 +34,6 @@ function hexPoints(w: number, d: number): [number, number, number][] {
     [-hw, 0, 0],
     [-hw * 0.55, 0, -hd],
   ];
-  return pts;
 }
 
 export function DepartmentZone3D({
@@ -51,15 +44,15 @@ export function DepartmentZone3D({
   avatarStyle = "B",
 }: DepartmentZone3DProps) {
   const router = useRouter();
-  const [cx, , cz] = departmentCenter(department.officeX, department.officeY);
-  const zoneWidth = 5.2;
-  const zoneDepth = 2.8;
+  const zoneCenter = getDepartmentZoneCenter(department.slug);
+  const [cx, , cz] = zoneCenter;
   const theme = ENVIRONMENT_THEMES[environmentStyle];
+  const facing = getFacingHubRotation(cx, cz);
 
   const hexShape = useMemo(() => {
     const shape = new THREE.Shape();
-    const hw = zoneWidth / 2;
-    const hd = zoneDepth / 2;
+    const hw = ZONE_WIDTH / 2;
+    const hd = ZONE_DEPTH / 2;
     shape.moveTo(-hw * 0.55, -hd);
     shape.lineTo(hw * 0.55, -hd);
     shape.lineTo(hw, 0);
@@ -68,15 +61,19 @@ export function DepartmentZone3D({
     shape.lineTo(-hw, 0);
     shape.closePath();
     return shape;
-  }, [zoneWidth, zoneDepth]);
+  }, []);
 
-  const borderPoints = useMemo(() => hexPoints(zoneWidth, zoneDepth), [zoneWidth, zoneDepth]);
+  const borderPoints = useMemo(() => hexPoints(ZONE_WIDTH, ZONE_DEPTH), []);
+
+  const labelOffsetZ = -ZONE_DEPTH / 2 + 0.2;
+  const labelX = cx + labelOffsetZ * Math.sin(facing);
+  const labelZ = cz + labelOffsetZ * Math.cos(facing);
 
   return (
     <group>
       <mesh
         position={[cx, 0.015, cz]}
-        rotation={[-Math.PI / 2, 0, 0]}
+        rotation={[-Math.PI / 2, facing, 0]}
         receiveShadow
         onClick={() => router.push(`/departments/${department.slug}`)}
         onPointerOver={() => {
@@ -98,16 +95,18 @@ export function DepartmentZone3D({
         />
       </mesh>
 
-      <Line
-        points={borderPoints.map(([x, y, z]) => [cx + x, 0.03, cz + z] as [number, number, number])}
-        color={department.color}
-        lineWidth={environmentStyle === "B" ? 2.5 : 1.5}
-        transparent
-        opacity={environmentStyle === "B" ? 0.9 : 0.6}
-      />
+      <group position={[cx, 0.03, cz]} rotation={[0, facing, 0]}>
+        <Line
+          points={borderPoints}
+          color={department.color}
+          lineWidth={environmentStyle === "B" ? 2.5 : 1.5}
+          transparent
+          opacity={environmentStyle === "B" ? 0.9 : 0.6}
+        />
+      </group>
 
       <Html
-        position={[cx, 0.5, cz - zoneDepth / 2 + 0.15]}
+        position={[labelX, 0.5, labelZ]}
         center
         distanceFactor={12}
         style={{ pointerEvents: "none" }}
@@ -129,35 +128,28 @@ export function DepartmentZone3D({
       </Html>
 
       {agents.slice(0, 6).map((agent, i) => {
-        const layout = DESK_LAYOUTS[i % DESK_LAYOUTS.length];
-        const [wx, , wz] = agentWorldPosition(
-          department.officeX,
-          department.officeY,
-          layout.deskX,
-          layout.deskY
-        );
-        const chairOffset = layout.rot === 0 ? 0.42 : -0.42;
-        const chairRotation = layout.rot + Math.PI;
-        const deskFacingOffset = layout.rot === 0 ? -0.05 : 0.05;
-        const chairZ = wz + chairOffset + deskFacingOffset;
+        const desk = getDeskWorldTransform(zoneCenter, i);
+        const agentFacingOffset = 0.05;
+        const agentX = desk.chairPosition[0] - agentFacingOffset * Math.sin(desk.rotation);
+        const agentZ = desk.chairPosition[2] - agentFacingOffset * Math.cos(desk.rotation);
 
         return (
           <group key={agent.id}>
             <Workstation
-              position={[wx, 0, wz]}
-              rotation={layout.rot}
+              position={desk.position}
+              rotation={desk.rotation}
               screenColor={department.color}
               environmentStyle={environmentStyle}
             />
             <OfficeChair
-              position={[wx, 0, chairZ]}
-              rotation={chairRotation}
+              position={desk.chairPosition}
+              rotation={desk.chairRotation}
               environmentStyle={environmentStyle}
             />
             <AgentCharacter
               agent={agent}
-              position={[wx, 0.2, chairZ]}
-              rotation={chairRotation}
+              position={[agentX, 0.2, agentZ]}
+              rotation={desk.chairRotation}
               highlight={highlightedAgentId === agent.id}
               avatarStyle={avatarStyle}
             />
@@ -166,7 +158,11 @@ export function DepartmentZone3D({
       })}
 
       <Plant
-        position={[cx - zoneWidth / 2 + 0.35, 0, cz + zoneDepth / 2 - 0.25]}
+        position={[
+          cx + (ZONE_WIDTH / 2 - 0.35) * Math.cos(facing) - (ZONE_DEPTH / 2 - 0.25) * Math.sin(facing),
+          0,
+          cz + (ZONE_WIDTH / 2 - 0.35) * Math.sin(facing) + (ZONE_DEPTH / 2 - 0.25) * Math.cos(facing),
+        ]}
         environmentStyle={environmentStyle}
       />
     </group>

@@ -34,7 +34,7 @@ export function departmentCenter(
   officeY: number
 ): [number, number, number] {
   return position2dTo3d({
-    x: officeX + 140,
-    y: officeY + 80,
+    x: officeX + 130,
+    y: officeY + 70,
   });
 }

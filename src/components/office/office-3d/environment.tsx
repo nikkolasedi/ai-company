@@ -92,8 +92,6 @@ export function Environment3D({ style }: { style: EnvironmentStyle }) {
           <Wall position={[cx, WALL_HEIGHT / 2, 0]} size={[WORLD_WIDTH, WALL_HEIGHT, 0.12]} color={theme.wall} />
           <Wall position={[0, WALL_HEIGHT / 2, cz]} size={[0.12, WALL_HEIGHT, WORLD_DEPTH]} color={theme.wall} />
           <Wall position={[WORLD_WIDTH, WALL_HEIGHT / 2, cz]} size={[0.12, WALL_HEIGHT, WORLD_DEPTH]} color={theme.wall} />
-          <Wall position={[cx, WALL_HEIGHT * 0.35, cz * 0.55]} size={[0.08, WALL_HEIGHT * 0.7, WORLD_DEPTH * 0.45]} color={theme.wall} />
-          <Wall position={[cx * 0.55, WALL_HEIGHT * 0.35, cz]} size={[WORLD_WIDTH * 0.45, WALL_HEIGHT * 0.7, 0.08]} color={theme.wall} />
         </>
       )}
 

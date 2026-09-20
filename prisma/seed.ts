@@ -5,101 +5,119 @@ import {
   TaskStatus,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import {
+  COMPACT_DESK_2D,
+  DEPARTMENT_ZONE_LAYOUTS,
+  departmentOfficeOrigin,
+} from "../src/lib/office/layout";
 
 const db = new PrismaClient();
 
-const DEPARTMENTS = [
-  {
+const AGENTS_BY_SLUG: Record<
+  string,
+  Array<{
+    name: string;
+    role: string;
+    title: string;
+    isOrchestrator?: boolean;
+  }>
+> = {
+  operations: [
+    { name: "Alex Morgan", role: "Operations Manager", title: "Head of Operations", isOrchestrator: true },
+    { name: "Sam Rivera", role: "Process Analyst", title: "Process Analyst" },
+    { name: "Jordan Lee", role: "Procurement", title: "Procurement Specialist" },
+    { name: "Casey Kim", role: "Admin", title: "Administrative Coordinator" },
+  ],
+  marketing: [
+    { name: "Mia Chen", role: "Marketing Manager", title: "Head of Marketing" },
+    { name: "Liam Foster", role: "Content", title: "Content Strategist" },
+    { name: "Emma Walsh", role: "SEO", title: "SEO Specialist" },
+    { name: "Noah Brooks", role: "Social Media", title: "Social Media Manager" },
+    { name: "Ava Singh", role: "Brand", title: "Brand Designer" },
+    { name: "Ethan Park", role: "Campaign Analyst", title: "Campaign Analyst" },
+  ],
+  sales: [
+    { name: "Olivia Hart", role: "Sales Manager", title: "Head of Sales" },
+    { name: "James Reid", role: "Lead Research", title: "Lead Research Specialist" },
+    { name: "Sophia Grant", role: "Outreach", title: "Outreach Specialist" },
+    { name: "Ben Carter", role: "CRM", title: "CRM Manager" },
+    { name: "Isabella Cruz", role: "Proposal", title: "Proposal Writer" },
+    { name: "Lucas Meyer", role: "Sales Analyst", title: "Sales Analyst" },
+  ],
+  finance: [
+    { name: "Charlotte Weber", role: "Finance Manager", title: "Head of Finance" },
+    { name: "Henry Bauer", role: "Invoice", title: "Invoice Specialist" },
+    { name: "Amelia Koch", role: "Cashflow", title: "Cashflow Analyst" },
+    { name: "Felix Braun", role: "Financial Reporting", title: "Financial Reporter" },
+  ],
+  "customer-communication": [
+    { name: "Grace Nguyen", role: "Customer Support", title: "Support Lead" },
+    { name: "Daniel Ortiz", role: "Email", title: "Email Specialist" },
+    { name: "Chloe Martin", role: "Meeting", title: "Meeting Coordinator" },
+    { name: "Ryan Patel", role: "Communication", title: "Communications Manager" },
+    { name: "Zoe Anderson", role: "Customer Success", title: "Customer Success Manager" },
+  ],
+  technology: [
+    { name: "Marcus Tech", role: "CTO", title: "Chief Technology Officer" },
+    { name: "Nina Code", role: "Developer", title: "Senior Developer" },
+    { name: "Oscar Test", role: "QA", title: "QA Engineer" },
+    { name: "Paula Data", role: "Data", title: "Data Analyst" },
+    { name: "Quinn IT", role: "IT Support", title: "IT Support Specialist" },
+  ],
+};
+
+const DEPARTMENT_META: Record<string, { name: string; color: string; description: string }> = {
+  operations: {
     name: "Operations",
-    slug: "operations",
     color: "#6366f1",
     description: "Process optimization, procurement, and daily operations",
-    officeX: 100,
-    officeY: 320,
-    agents: [
-      { name: "Alex Morgan", role: "Operations Manager", title: "Head of Operations", isOrchestrator: true, deskX: 0, deskY: 0 },
-      { name: "Sam Rivera", role: "Process Analyst", title: "Process Analyst", deskX: 60, deskY: 20 },
-      { name: "Jordan Lee", role: "Procurement", title: "Procurement Specialist", deskX: 120, deskY: 0 },
-      { name: "Casey Kim", role: "Admin", title: "Administrative Coordinator", deskX: 180, deskY: 20 },
-    ],
   },
-  {
+  marketing: {
     name: "Marketing",
-    slug: "marketing",
     color: "#ec4899",
     description: "Brand, content, SEO, and campaign management",
-    officeX: 380,
-    officeY: 120,
-    agents: [
-      { name: "Mia Chen", role: "Marketing Manager", title: "Head of Marketing", deskX: 0, deskY: 0 },
-      { name: "Liam Foster", role: "Content", title: "Content Strategist", deskX: 60, deskY: 20 },
-      { name: "Emma Walsh", role: "SEO", title: "SEO Specialist", deskX: 120, deskY: 0 },
-      { name: "Noah Brooks", role: "Social Media", title: "Social Media Manager", deskX: 180, deskY: 20 },
-      { name: "Ava Singh", role: "Brand", title: "Brand Designer", deskX: 240, deskY: 0 },
-      { name: "Ethan Park", role: "Campaign Analyst", title: "Campaign Analyst", deskX: 300, deskY: 20 },
-    ],
   },
-  {
+  sales: {
     name: "Sales",
-    slug: "sales",
     color: "#22c55e",
     description: "Lead generation, outreach, CRM, and proposals",
-    officeX: 680,
-    officeY: 320,
-    agents: [
-      { name: "Olivia Hart", role: "Sales Manager", title: "Head of Sales", deskX: 0, deskY: 0 },
-      { name: "James Reid", role: "Lead Research", title: "Lead Research Specialist", deskX: 60, deskY: 20 },
-      { name: "Sophia Grant", role: "Outreach", title: "Outreach Specialist", deskX: 120, deskY: 0 },
-      { name: "Ben Carter", role: "CRM", title: "CRM Manager", deskX: 180, deskY: 20 },
-      { name: "Isabella Cruz", role: "Proposal", title: "Proposal Writer", deskX: 240, deskY: 0 },
-      { name: "Lucas Meyer", role: "Sales Analyst", title: "Sales Analyst", deskX: 300, deskY: 20 },
-    ],
   },
-  {
+  finance: {
     name: "Finance",
-    slug: "finance",
     color: "#f59e0b",
     description: "Invoicing, cashflow, and financial reporting",
-    officeX: 100,
-    officeY: 520,
-    agents: [
-      { name: "Charlotte Weber", role: "Finance Manager", title: "Head of Finance", deskX: 0, deskY: 0 },
-      { name: "Henry Bauer", role: "Invoice", title: "Invoice Specialist", deskX: 60, deskY: 20 },
-      { name: "Amelia Koch", role: "Cashflow", title: "Cashflow Analyst", deskX: 120, deskY: 0 },
-      { name: "Felix Braun", role: "Financial Reporting", title: "Financial Reporter", deskX: 180, deskY: 20 },
-    ],
   },
-  {
+  "customer-communication": {
     name: "Customer & Communication",
-    slug: "customer-communication",
     color: "#06b6d4",
     description: "Customer support, email, meetings, and success",
-    officeX: 380,
-    officeY: 520,
-    agents: [
-      { name: "Grace Nguyen", role: "Customer Support", title: "Support Lead", deskX: 0, deskY: 0 },
-      { name: "Daniel Ortiz", role: "Email", title: "Email Specialist", deskX: 60, deskY: 20 },
-      { name: "Chloe Martin", role: "Meeting", title: "Meeting Coordinator", deskX: 120, deskY: 0 },
-      { name: "Ryan Patel", role: "Communication", title: "Communications Manager", deskX: 180, deskY: 20 },
-      { name: "Zoe Anderson", role: "Customer Success", title: "Customer Success Manager", deskX: 240, deskY: 0 },
-    ],
   },
-  {
+  technology: {
     name: "Technology",
-    slug: "technology",
     color: "#8b5cf6",
     description: "Development, QA, data, and IT support",
-    officeX: 680,
-    officeY: 120,
-    agents: [
-      { name: "Marcus Tech", role: "CTO", title: "Chief Technology Officer", deskX: 0, deskY: 0 },
-      { name: "Nina Code", role: "Developer", title: "Senior Developer", deskX: 60, deskY: 20 },
-      { name: "Oscar Test", role: "QA", title: "QA Engineer", deskX: 120, deskY: 0 },
-      { name: "Paula Data", role: "Data", title: "Data Analyst", deskX: 180, deskY: 20 },
-      { name: "Quinn IT", role: "IT Support", title: "IT Support Specialist", deskX: 240, deskY: 0 },
-    ],
   },
-];
+};
+
+const DEPARTMENTS = DEPARTMENT_ZONE_LAYOUTS.map((zone) => {
+  const origin = departmentOfficeOrigin(zone.center2d);
+  const meta = DEPARTMENT_META[zone.slug];
+  const agentDefs = AGENTS_BY_SLUG[zone.slug] ?? [];
+
+  return {
+    name: meta.name,
+    slug: zone.slug,
+    color: meta.color,
+    description: meta.description,
+    officeX: origin.officeX,
+    officeY: origin.officeY,
+    agents: agentDefs.map((agent, i) => ({
+      ...agent,
+      deskX: COMPACT_DESK_2D[i]?.deskX ?? 15,
+      deskY: COMPACT_DESK_2D[i]?.deskY ?? 10,
+    })),
+  };
+});
 
 async function main() {
   console.log("Seeding Nova Coffee GmbH...");

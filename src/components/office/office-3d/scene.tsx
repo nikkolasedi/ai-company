@@ -9,7 +9,8 @@ import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import type { DelegationLink } from "@/hooks/use-office-live-data";
 import type { AvatarStyle, EnvironmentStyle } from "@/lib/office/visual-styles";
 import { DEFAULT_AVATAR_STYLE, DEFAULT_ENVIRONMENT_STYLE } from "@/lib/office/visual-styles";
-import { agentWorldPosition, departmentCenter, position2dTo3d, SCENE_CENTER } from "@/lib/office/coordinates";
+import { position2dTo3d, SCENE_CENTER } from "@/lib/office/coordinates";
+import { getDepartmentZoneCenter, getDeskWorldTransform } from "@/lib/office/layout";
 import { AgentCharacter } from "./agent-character";
 import { DelegationLine } from "./delegation-line";
 import { DepartmentZone3D } from "./department-zone";
@@ -53,7 +54,7 @@ function HubConnectionLines({
   return (
     <>
       {departments.map((dept) => {
-        const [cx, , cz] = departmentCenter(dept.officeX, dept.officeY);
+        const [cx, , cz] = getDepartmentZoneCenter(dept.slug);
         const midY = 0.8;
         const points: [number, number, number][] = [
           [cx, 0.05, cz],
@@ -101,17 +102,22 @@ function SceneContent({
 
   const agentPositions = useMemo(() => {
     const map = new Map<string, [number, number, number]>();
-    for (const agent of agents) {
-      const dept = departments.find((d) => d.slug === agent.department.slug);
-      if (dept) {
-        map.set(
-          agent.id,
-          agentWorldPosition(dept.officeX, dept.officeY, agent.deskX + 60, agent.deskY + 35)
-        );
-      }
+    for (const dept of departments) {
+      const zoneCenter = getDepartmentZoneCenter(dept.slug);
+      const deptAgents = agents.filter(
+        (a) => a.department.slug === dept.slug && !a.isOrchestrator
+      );
+      deptAgents.forEach((agent, i) => {
+        const desk = getDeskWorldTransform(zoneCenter, i);
+        map.set(agent.id, [desk.chairPosition[0], 0.2, desk.chairPosition[2]]);
+      });
+    }
+    const ceo = agents.find((a) => a.isOrchestrator);
+    if (ceo) {
+      map.set(ceo.id, [meetingX, 0.2, meetingZ + 0.55]);
     }
     return map;
-  }, [agents, departments]);
+  }, [agents, departments, meetingX, meetingZ]);
 
   const bloomIntensity = getEnvironmentBloom(environmentStyle);
 
