@@ -18,6 +18,12 @@ export const metadata: Metadata = {
   description: "Your AI workforce, organized like a real company",
 };
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
