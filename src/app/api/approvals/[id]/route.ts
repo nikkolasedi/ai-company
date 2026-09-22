@@ -45,7 +45,11 @@ export async function PATCH(
   });
 
   if (existing.taskId) {
-    resolveApproval(existing.taskId, status === "APPROVED");
+    const resumed = resolveApproval(existing.taskId, status === "APPROVED");
+    if (!resumed) {
+      const { resumeAfterApproval } = await import("@/lib/office/work");
+      await resumeAfterApproval(existing.taskId, status === "APPROVED");
+    }
   }
 
   await db.auditLog.create({

@@ -5,8 +5,12 @@ import { Settings, hasStoredSettings } from "./core/settings.js";
 import { Colony } from "./game/colony.js";
 import { loadKit } from "./world/kit.js";
 import { loadCrew, crewRig } from "./agents/crew.js";
+import { loadHumans, humanRigs } from "./agents/humans.js";
 import { PLANETS } from "./world/planet.js";
 import type { BotCrossingThread } from "./adapters/agent-to-thread";
+
+/** Survives leaving the office and coming back, so the ship walk-out plays once per session. */
+const seenAgents: Record<string, number> = {};
 
 export interface ColonyRuntime {
   engine: Engine;
@@ -32,24 +36,28 @@ export async function bootColony(container: HTMLElement): Promise<ColonyRuntime>
   const rig = new CameraRig(engine.camera, engine.canvas, settings);
   const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer);
 
-  const seen: Record<string, number> = {};
-
   const settle = (p: Promise<unknown>) =>
     p.then(() => null, (err: unknown) => err);
 
-  const [kitError, crewError] = await Promise.all([settle(loadKit()), settle(loadCrew())]);
+  const [kitError, humanError] = await Promise.all([settle(loadKit()), settle(loadHumans())]);
 
-  if (!kitError && !crewError) {
-    colony.astronauts.setRig(crewRig());
+  if (!kitError && !humanError) {
+    colony.astronauts.setHumans(humanRigs());
     colony.onAssetsReady();
   } else {
-    console.error("[BotCrossing] asset load failed:", kitError || crewError);
+    const crewError = kitError ? kitError : await settle(loadCrew());
+    if (!kitError && !crewError) {
+      colony.astronauts.setRig(crewRig());
+      colony.onAssetsReady();
+    } else {
+      console.error("[BotCrossing] asset load failed:", kitError || humanError || crewError);
+    }
   }
 
   const applyThreads = (list: BotCrossingThread[]) => {
-    const known = new Set(Object.keys(seen));
+    const known = new Set(Object.keys(seenAgents));
     for (const thread of list) {
-      if (!seen[thread.id]) seen[thread.id] = Date.now();
+      if (!seenAgents[thread.id]) seenAgents[thread.id] = Date.now();
     }
     colony.setThreads(list, new Set(), new Set(), known);
   };

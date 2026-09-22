@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AgentWithDepartment, OfficeEvent } from "@/types";
 import {
@@ -11,19 +10,34 @@ import {
 } from "@/lib/bot-crossing/adapters/agent-to-thread";
 import type { ColonyRuntime } from "@/lib/bot-crossing/runtime";
 
+function eventKey(event: OfficeEvent) {
+  return `${event.timestamp}|${event.type}|${event.agentId ?? ""}|${event.taskId ?? ""}|${event.message ?? ""}`;
+}
+
 interface BotCrossingViewProps {
   agents: AgentWithDepartment[];
   events: OfficeEvent[];
   highlightedAgentId?: string;
+  selectedAgentId?: string | null;
+  onSelectAgent: (id: string | null) => void;
 }
 
-export function BotCrossingView({ agents, events, highlightedAgentId }: BotCrossingViewProps) {
+export function BotCrossingView({
+  agents,
+  events,
+  highlightedAgentId: _highlightedAgentId,
+  selectedAgentId,
+  onSelectAgent,
+}: BotCrossingViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const runtimeRef = useRef<ColonyRuntime | null>(null);
   const threadsRef = useRef<Map<string, BotCrossingThread>>(new Map());
+  const seenEventsRef = useRef(new Set<string>());
+  const eventsReadyRef = useRef(false);
   const clickCleanupRef = useRef<(() => void) | null>(null);
+  const onSelectRef = useRef(onSelectAgent);
   const [ready, setReady] = useState(false);
-  const router = useRouter();
+  onSelectRef.current = onSelectAgent;
 
   const applyAllThreads = useCallback((runtime: ColonyRuntime) => {
     runtime.applyThreads([...threadsRef.current.values()]);
@@ -54,11 +68,14 @@ export function BotCrossingView({ agents, events, highlightedAgentId }: BotCross
       if (canvas) {
         canvas.classList.add("bot-crossing-canvas");
         const onClick = (e: MouseEvent) => {
+          // Orbit and pan happen on this same canvas. A drag ends in a click, and
+          // that used to open whoever was under the cursor.
+          if (!runtime.rig.wasClick) return;
           const rect = canvas.getBoundingClientRect();
           const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
           const ndcY = -(((e.clientY - rect.top) / rect.height) * 2 - 1);
           const id = runtime.pickAgent(ndcX, ndcY, rect.width / rect.height);
-          if (id) router.push(`/agents/${id}`);
+          onSelectRef.current(id);
         };
         canvas.addEventListener("click", onClick);
         clickCleanupRef.current = () => canvas.removeEventListener("click", onClick);
@@ -89,26 +106,39 @@ export function BotCrossingView({ agents, events, highlightedAgentId }: BotCross
   }, [agents, ready, applyAllThreads]);
 
   useEffect(() => {
-    if (!ready || !events.length) return;
+    if (!ready) return;
     const runtime = runtimeRef.current;
     if (!runtime) return;
 
-    for (const event of events) {
-      if (!event.agentId || event.type === "CONNECTED") continue;
-      const existing = threadsRef.current.get(event.agentId);
+    // The roster already matches the people on screen. Replaying the activity
+    // list would let an older event overwrite the task they are on now.
+    if (!eventsReadyRef.current) {
+      for (const event of events) seenEventsRef.current.add(eventKey(event));
+      eventsReadyRef.current = true;
+      return;
+    }
+
+    const pending = events.filter(
+      (event) => event.agentId && event.type !== "CONNECTED" && !seenEventsRef.current.has(eventKey(event))
+    );
+    if (!pending.length) return;
+
+    for (const event of [...pending].reverse()) {
+      seenEventsRef.current.add(eventKey(event));
+      const existing = threadsRef.current.get(event.agentId!);
       if (!existing) continue;
-      threadsRef.current.set(event.agentId, patchThreadFromEvent(existing, event));
+      threadsRef.current.set(event.agentId!, patchThreadFromEvent(existing, event));
     }
     applyAllThreads(runtime);
   }, [events, ready, applyAllThreads]);
 
   useEffect(() => {
-    if (!ready || !highlightedAgentId) return;
+    if (!ready) return;
     const runtime = runtimeRef.current;
     if (!runtime) return;
-    const agent = runtime.colony.agentFor(highlightedAgentId);
-    if (agent) runtime.colony.astronauts.setSelected(agent);
-  }, [highlightedAgentId, ready]);
+    const agent = selectedAgentId ? runtime.colony.agentFor(selectedAgentId) : null;
+    runtime.colony.astronauts.setSelected(agent);
+  }, [selectedAgentId, ready, agents]);
 
   return (
     <div

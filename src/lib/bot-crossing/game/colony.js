@@ -64,10 +64,11 @@ const LIVE_GROWTH = 0.004
 /** How many zones' positions to remember, including repos with nothing running in them. */
 const LAYOUT_MEMORY = 80
 
-export const STATUS_ORDER = ['blocked', 'waiting', 'working', 'celebrating', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'waiting', 'talking', 'working', 'celebrating', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
+  talking: 'Talking',
   waiting: 'Waiting on you',
   blocked: 'Blocked',
   celebrating: 'Shipped',
@@ -80,9 +81,10 @@ export const STATUS_LABEL = {
 /** Thread → behaviour. First match wins, exactly like the board's auto-sort. */
 export function statusFor(thread, now = Date.now()) {
   if (thread.hasError) return 'blocked'
+  if (thread.unread) return 'waiting'
+  if (thread.meetId) return 'talking'
   if (thread.running) return 'working'
   if (thread.prState === 'MERGED') return 'celebrating'
-  if (thread.unread) return 'waiting'
   if (now - thread.lastActivityAt > STALE_MS) return 'sleeping'
   return 'idle'
 }
@@ -95,6 +97,7 @@ export function statusFor(thread, now = Date.now()) {
 const BADGE_FOR = {
   waiting: BADGE.waiting,
   blocked: BADGE.blocked,
+  talking: BADGE.working,
   working: BADGE.working,
   celebrating: BADGE.done,
   sleeping: BADGE.none,
@@ -597,6 +600,24 @@ export class Colony {
       const entry = this.buildings.get(member.id)
       member.site = this._workSite(this.plots.get(entry.plot), entry, entry.slot)
     }
+    for (const member of roster) {
+      if (!member.thread.meetWalk || member.status !== 'talking') continue
+      const partner = roster.find((other) => other.id === member.thread.meetId)
+      if (!partner?.site || !member.site) continue
+      const dx = member.site.x - partner.site.x
+      const dz = member.site.z - partner.site.z
+      const len = Math.hypot(dx, dz) || 1
+      const stand = new THREE.Vector3(
+        partner.site.x + (dx / len) * 1.7,
+        0,
+        partner.site.z + (dz / len) * 1.7
+      )
+      const free = this.nav?.nearestClear(stand.x, stand.z, 2)
+      if (free) stand.set(free.x, 0, free.z)
+      member.site = stand
+      member.anchor = partner.site.clone()
+      if (partner.status === 'talking') partner.anchor = stand.clone()
+    }
     this._syncFaunaSites()
     this.stats = { ...stats, done: stats.celebrating }
     this.astronauts.setRoster(roster, this._world())
@@ -1044,6 +1065,7 @@ export class Colony {
     this.ship.update(dt, elapsed, night)
 
     this._growBuildings(dt)
+    this.astronauts.viewPoint = this.camera?.position || null
     this.astronauts.update(dt, elapsed)
     this.astronauts.updateRings(elapsed)
     this.indicators.update(this.astronauts.agents, elapsed, (a) => this._badgeFor(a))

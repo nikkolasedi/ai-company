@@ -1,6 +1,6 @@
-import { AgentStatus, TaskStatus } from "@prisma/client";
+import { AgentStatus, TaskStatus, type Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import type { DashboardStats } from "@/types";
+import type { AgentWithDepartment, DashboardStats, OfficeTask } from "@/types";
 
 export async function getDepartmentsWithAgents(organizationId: string) {
   const departments = await db.department.findMany({
@@ -52,39 +52,68 @@ export async function getDepartmentsWithAgents(organizationId: string) {
   }));
 }
 
-export async function getAgents(organizationId: string) {
-  const agents = await db.agent.findMany({
-    where: { organizationId },
-    include: {
-      department: { select: { id: true, name: true, slug: true, color: true } },
-    },
-    orderBy: { name: "asc" },
-  });
+const openTaskInclude = {
+  grants: { include: { connector: { select: { id: true, name: true } } } },
+} satisfies Prisma.TaskInclude;
 
-  const activeTasks = await db.task.findMany({
-    where: {
-      organizationId,
-      status: { in: [TaskStatus.RUNNING, TaskStatus.AWAITING_APPROVAL] },
-      assignedAgentId: { not: null },
-    },
-  });
+function toOfficeTask(
+  task: Prisma.TaskGetPayload<{ include: typeof openTaskInclude }>
+): OfficeTask {
+  return {
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    description: task.description,
+    handoffAgentId: task.handoffAgentId,
+    handoffNote: task.handoffNote,
+    handoffReply: task.handoffReply,
+    grants: task.grants.map((grant) => ({
+      connectorId: grant.connectorId,
+      connectorName: grant.connector.name,
+      permission: grant.permission,
+    })),
+  };
+}
 
-  return agents.map((a) => {
-    const task = activeTasks.find((t) => t.assignedAgentId === a.id);
+export async function getAgents(organizationId: string): Promise<AgentWithDepartment[]> {
+  const [agents, tasks] = await Promise.all([
+    db.agent.findMany({
+      where: { organizationId },
+      include: {
+        department: { select: { id: true, name: true, slug: true, color: true } },
+      },
+      orderBy: { name: "asc" },
+    }),
+    db.task.findMany({
+      where: {
+        organizationId,
+        status: { in: [TaskStatus.RUNNING, TaskStatus.AWAITING_APPROVAL] },
+      },
+      include: openTaskInclude,
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
+
+  return agents.map((agent) => {
+    const own = tasks.find((task) => task.assignedAgentId === agent.id);
+    const incoming = tasks.find(
+      (task) => task.handoffAgentId === agent.id && !task.handoffReply && task.assignedAgentId !== agent.id
+    );
+    const outgoing = own?.handoffAgentId && !own.handoffReply ? own.handoffAgentId : null;
     return {
-      id: a.id,
-      name: a.name,
-      role: a.role,
-      title: a.title,
-      status: a.status,
-      avatar: a.avatar,
-      deskX: a.deskX,
-      deskY: a.deskY,
-      isOrchestrator: a.isOrchestrator,
-      department: a.department,
-      currentTask: task
-        ? { id: task.id, title: task.title, status: task.status }
-        : null,
+      id: agent.id,
+      name: agent.name,
+      role: agent.role,
+      title: agent.title,
+      status: agent.status,
+      avatar: agent.avatar,
+      deskX: agent.deskX,
+      deskY: agent.deskY,
+      isOrchestrator: agent.isOrchestrator,
+      department: agent.department,
+      currentTask: own ? toOfficeTask(own) : null,
+      meetAgentId: outgoing || incoming?.assignedAgentId || null,
+      meetWalk: Boolean(outgoing),
     };
   });
 }
@@ -94,7 +123,16 @@ export async function getAgentById(organizationId: string, agentId: string) {
     where: { id: agentId, organizationId },
     include: {
       department: true,
-      tasks: { orderBy: { createdAt: "desc" }, take: 10 },
+      tasks: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: {
+          grants: { include: { connector: { select: { id: true, name: true } } } },
+          messages: { orderBy: { createdAt: "asc" }, take: 20 },
+          handoffAgent: { select: { id: true, name: true } },
+          approvals: { where: { status: "PENDING" }, take: 3 },
+        },
+      },
       memories: { orderBy: { createdAt: "desc" }, take: 5 },
       metrics: { orderBy: { recordedAt: "desc" }, take: 5 },
     },

@@ -112,18 +112,17 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
     return () => eventSource.close();
   }, []);
 
+  const refresh = async () => {
+    try {
+      const res = await fetch("/api/agents");
+      if (res.ok) setAgents(await res.json());
+    } catch {
+      // ignore polling errors
+    }
+  };
+
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch("/api/agents");
-        if (res.ok) {
-          const data = await res.json();
-          setAgents(data);
-        }
-      } catch {
-        // ignore polling errors
-      }
-    }, 5000);
+    const interval = setInterval(refresh, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -142,5 +141,6 @@ export function useOfficeLiveData(initialAgents: AgentWithDepartment[]) {
     highlightedAgentId,
     delegationLinks,
     toolPulses,
+    refresh,
   };
 }

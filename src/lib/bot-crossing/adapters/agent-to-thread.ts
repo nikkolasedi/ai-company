@@ -21,6 +21,8 @@ export interface BotCrossingThread {
   prState?: string | null;
   archived?: boolean;
   sizeBytes?: number;
+  meetId?: string | null;
+  meetWalk?: boolean;
 }
 
 export function markAgentCelebrating(agentId: string) {
@@ -53,6 +55,8 @@ export function agentToThread(agent: AgentWithDepartment): BotCrossingThread {
     ...flags,
     archived: false,
     sizeBytes: agent.currentTask ? 50_000 : 8_000,
+    meetId: agent.meetAgentId ?? null,
+    meetWalk: Boolean(agent.meetWalk),
   };
 }
 
@@ -72,11 +76,6 @@ export function mergeAgentIntoThread(
   return {
     ...base,
     createdAt: existing.createdAt ?? base.createdAt,
-    // Preserve celebration from SSE until agent poll catches up
-    prState: existing.prState === "MERGED" || base.prState === "MERGED" ? "MERGED" : null,
-    running: base.running || existing.running,
-    unread: base.unread || existing.unread,
-    hasError: base.hasError || existing.hasError,
     lastActivityAt: Math.max(existing.lastActivityAt ?? 0, base.lastActivityAt ?? 0),
   };
 }

@@ -17,5 +17,22 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  return NextResponse.json(agent);
+  const { db } = await import("@/lib/db");
+  const { TaskStatus } = await import("@prisma/client");
+  const incomingHandoff = await db.task.findFirst({
+    where: {
+      organizationId: session.user.organizationId,
+      handoffAgentId: id,
+      handoffReply: null,
+      status: { in: [TaskStatus.RUNNING, TaskStatus.AWAITING_APPROVAL] },
+      NOT: { assignedAgentId: id },
+    },
+    include: {
+      assignedAgent: { select: { id: true, name: true } },
+      messages: { orderBy: { createdAt: "asc" }, take: 20 },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return NextResponse.json({ ...agent, incomingHandoff });
 }

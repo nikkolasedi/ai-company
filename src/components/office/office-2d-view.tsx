@@ -17,19 +17,29 @@ function AgentAvatar({
   agent,
   deptColor,
   highlight,
+  onSelect,
 }: {
   agent: AgentWithDepartment;
   deptColor: string;
   highlight?: boolean;
+  onSelect: (id: string) => void;
 }) {
   return (
-    <Link href={`/agents/${agent.id}`}>
+    <button
+      type="button"
+      aria-label={agent.name}
+      className="absolute z-10 cursor-pointer"
+      style={{
+        left: agent.deskX + 20,
+        top: agent.deskY + 30,
+      }}
+      onClick={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onSelect(agent.id);
+      }}
+    >
       <motion.div
-        className="absolute cursor-pointer"
-        style={{
-          left: agent.deskX + 20,
-          top: agent.deskY + 30,
-        }}
         animate={
           highlight
             ? { scale: [1, 1.2, 1], y: [0, -4, 0] }
@@ -73,7 +83,7 @@ function AgentAvatar({
           )}
         </div>
       </motion.div>
-    </Link>
+    </button>
   );
 }
 
@@ -81,20 +91,21 @@ function DepartmentZone({
   department,
   agents,
   highlightedAgentId,
+  onSelectAgent,
 }: {
   department: DepartmentWithAgents;
   agents: AgentWithDepartment[];
   highlightedAgentId?: string;
+  onSelectAgent: (id: string) => void;
 }) {
   return (
-    <Link href={`/departments/${department.slug}`}>
-      <motion.div
-        className="absolute cursor-pointer"
-        style={{ left: department.officeX, top: department.officeY }}
-        whileHover={{ scale: 1.02 }}
-        transition={{ type: "spring", stiffness: 300 }}
-      >
-        <svg width="280" height="160" viewBox="0 0 280 160">
+    <motion.div
+      className="absolute"
+      style={{ left: department.officeX, top: department.officeY }}
+      whileHover={{ scale: 1.02 }}
+      transition={{ type: "spring", stiffness: 300 }}
+    >
+      <svg width="280" height="160" viewBox="0 0 280 160">
           <defs>
             <filter id={`shadow-${department.slug}`}>
               <feDropShadow dx="0" dy="4" stdDeviation="6" floodOpacity="0.3" />
@@ -113,33 +124,34 @@ function DepartmentZone({
             stroke={department.color + "66"}
             strokeWidth="1"
           />
-        </svg>
+      </svg>
 
-        <div
-          className="absolute left-1/2 top-8 -translate-x-1/2 text-center"
-          style={{ width: 200 }}
-        >
-          <p className="text-sm font-semibold" style={{ color: department.color }}>
-            {department.name}
-          </p>
-          <p className="text-xs text-zinc-500">
-            {department.activeAgentCount} active · {department.agents.length} agents
-          </p>
-        </div>
-
-        <div className="absolute inset-0">
-          {agents.map((agent) => (
-            <div key={agent.id} onClick={(e) => e.stopPropagation()}>
-              <AgentAvatar
-                agent={agent}
-                deptColor={department.color}
-                highlight={highlightedAgentId === agent.id}
-              />
-            </div>
-          ))}
-        </div>
-      </motion.div>
-    </Link>
+      <Link
+        href={`/departments/${department.slug}`}
+        className="absolute left-1/2 top-8 z-0 -translate-x-1/2 text-center"
+        style={{ width: 200 }}
+      >
+        <p className="text-sm font-semibold" style={{ color: department.color }}>
+          {department.name}
+        </p>
+        <p className="text-xs text-zinc-500">
+          {agents.filter((person) => person.status !== "IDLE" && person.status !== "OFFLINE").length} active ·{" "}
+          {agents.length} agents
+        </p>
+      </Link>
+      <div className="pointer-events-none absolute inset-0 z-10">
+        {agents.map((agent) => (
+          <div key={agent.id} className="pointer-events-auto">
+            <AgentAvatar
+              agent={agent}
+              deptColor={department.color}
+              highlight={highlightedAgentId === agent.id}
+              onSelect={onSelectAgent}
+            />
+          </div>
+        ))}
+      </div>
+    </motion.div>
   );
 }
 
@@ -147,12 +159,14 @@ interface Office2DViewProps {
   departments: DepartmentWithAgents[];
   agents: AgentWithDepartment[];
   highlightedAgentId?: string;
+  onSelectAgent: (id: string) => void;
 }
 
 export function Office2DView({
   departments,
   agents,
   highlightedAgentId,
+  onSelectAgent,
 }: Office2DViewProps) {
   return (
     <div className="flex h-full min-h-[320px] items-start justify-center overflow-auto">
@@ -181,6 +195,7 @@ export function Office2DView({
               department={dept}
               agents={agents.filter((a) => a.department.slug === dept.slug)}
               highlightedAgentId={highlightedAgentId}
+              onSelectAgent={onSelectAgent}
             />
           ))}
         </div>

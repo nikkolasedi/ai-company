@@ -63,6 +63,23 @@ export interface DashboardStats {
   recentDecisions: { id: string; action: string; resource: string; createdAt: string }[];
 }
 
+export interface OfficeGrant {
+  connectorId: string;
+  connectorName: string;
+  permission: string;
+}
+
+export interface OfficeTask {
+  id: string;
+  title: string;
+  status: TaskStatus;
+  description: string | null;
+  handoffAgentId: string | null;
+  handoffNote: string | null;
+  handoffReply: string | null;
+  grants: OfficeGrant[];
+}
+
 export interface AgentWithDepartment {
   id: string;
   name: string;
@@ -74,7 +91,11 @@ export interface AgentWithDepartment {
   deskY: number;
   isOrchestrator: boolean;
   department: { id: string; name: string; slug: string; color: string };
-  currentTask?: { id: string; title: string; status: TaskStatus } | null;
+  currentTask?: OfficeTask | null;
+  /** Colleague this person is walking toward or waiting on. */
+  meetAgentId?: string | null;
+  /** True when this person is the one who should walk over. */
+  meetWalk?: boolean;
 }
 
 export interface DepartmentWithAgents {

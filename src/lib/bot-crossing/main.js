@@ -10,6 +10,7 @@ import { DECK_TOP, PLOT_CELL, hexToWorld, worldToHex } from './world/plots.js'
 import { planMove } from './world/plot-move.js'
 import { loadKit } from './world/kit.js'
 import { crewRig, loadCrew } from './agents/crew.js'
+import { humanRigs, loadHumans } from './agents/humans.js'
 import { TIMES } from './world/sky.js'
 import { CURVE_FULL, bendPoint, installWorldCurve, setCurveView } from './core/curve.js'
 import { Ambience } from './audio/ambience.js'
@@ -1032,7 +1033,7 @@ async function boot() {
   // a thread shows up, and the crew's body mesh is built from the rig. Fetched alongside
   // the saved state rather than after it, since none of them waits on the others.
   const settle = (p) => p.then(() => null, (err) => err)
-  const [, kitError, crewError] = await Promise.all([
+  const [, kitError, humanError] = await Promise.all([
     fetchState()
       .then((s) => {
         state = s
@@ -1050,13 +1051,19 @@ async function boot() {
         hud.toast('Could not read the saved colony — archiving is off until you reload', 'err')
       }),
     settle(loadKit()),
-    settle(loadCrew()),
+    settle(loadHumans()),
   ])
-  if (kitError || crewError) {
-    hud.toast('Could not load the model assets — run `npm run assets`', 'err')
-    console.error(kitError || crewError)
+  if (kitError || humanError) {
+    const fallback = kitError ? kitError : await settle(loadCrew())
+    if (!kitError && !fallback) {
+      colony.astronauts.setRig(crewRig())
+    } else {
+      hud.toast('Could not load the model assets — run `npm run assets`', 'err')
+      console.error(kitError || humanError || fallback)
+    }
+  } else {
+    colony.astronauts.setHumans(humanRigs())
   }
-  colony.astronauts.setRig(crewRig())
   if (!kitError) colony.onAssetsReady()
 
   await poll()

@@ -98,8 +98,11 @@ export class SceneryReflections {
     camera.updateMatrixWorld()
     for (const agent of this.astronauts._drawnAgents) {
       if (agent.scale < 0.8) continue
-      this.astronauts.parts.visor.getMatrixAt(agent.index, this._matrix)
-      this._point.setFromMatrixPosition(this._matrix)
+      if (agent.headWorld) this._point.copy(agent.headWorld)
+      else {
+        this.astronauts.parts.visor.getMatrixAt(agent.index, this._matrix)
+        this._point.setFromMatrixPosition(this._matrix)
+      }
       const bent = bendPoint(this._projected.copy(this._point))
       // Skip reflections when every visor is too small or outside the view.
       if (bent.distanceToSquared(camera.position) > 35 * 35) continue
@@ -212,13 +215,25 @@ export class SceneryReflections {
     }
   }
 
+  _disposeTarget(target) {
+    if (!target) return
+    // Cube targets are allocated before the first face render. Disposing them
+    // without this guard makes Three.js read __webglFramebuffer[0] on undefined.
+    const initialized = this.renderer?.properties?.get(target)?.__webglFramebuffer
+    if (initialized) target.dispose()
+  }
+
   _release() {
     this.invalidate()
     this.uniforms.uReflectionA.value = null
     this.uniforms.uReflectionB.value = null
-    for (const target of this.targets || []) target.dispose()
-    this.targets = null
+    const targets = this.targets
     this.cube = null
+    this.targets = null
+    if (!targets) return
+    const active = this.renderer?.getRenderTarget?.()
+    if (active && targets.includes(active)) this.renderer.setRenderTarget(null)
+    for (const target of targets) this._disposeTarget(target)
   }
 
   dispose() { this._release() }

@@ -12,6 +12,13 @@ them in the public domain.
 | `forest.glb` | [KayKit : Forest Nature Pack](https://kaylousberg.itch.io/kaykit-forest) | CC0 1.0 |
 | `nature.glb` | [Nature Kit](https://kenney.nl/assets/nature-kit) by **[Kenney](https://kenney.nl)** — palms, cacti, pines, autumn and jungle trees, recoloured and vertex-baked by `tools/build-nature.mjs` | CC0 1.0 |
 
+The office workers in `humans/` replace the astronaut suit in the office view:
+
+| File | Built from | Licence |
+| --- | --- | --- |
+| `humans/human-male.glb` | Suit, from [Quaternius : Ultimate Modular Men](https://quaternius.com/packs/ultimatemodularcharacters.html) | CC0 1.0 |
+| `humans/human-female.glb` | Suit, from [Quaternius : Ultimate Modular Women](https://quaternius.com/packs/ultimatemodularwomen.html) | CC0 1.0 |
+
 CC0 requires nothing of you. Crediting Kay and Kenney costs nothing either.
 
 See the repository README under "Where the art comes from" for how these are packed, and

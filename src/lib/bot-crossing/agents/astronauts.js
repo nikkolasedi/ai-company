@@ -36,6 +36,7 @@ const SUIT_TONES = [0xf3f1ec, 0xe8e4dc, 0xf7f4ee, 0xdfe4e8, 0xf1e9df]
 
 /** Trim + eye colour per behaviour. Eyes are pushed past 1.0 so the bloom pass catches them. */
 const AGENT_LOOK = {
+  talking: { trim: 0x3d8ea8, eye: [0.5, 1.8, 2.6] },
   working: { trim: 0x4f9a63, eye: [0.35, 2.5, 1.15] },
   waiting: { trim: 0x4f7ec9, eye: [0.45, 1.5, 3.0] },
   blocked: { trim: 0xc94f4f, eye: [3.0, 0.5, 0.45] },
@@ -49,7 +50,7 @@ const AGENT_LOOK = {
 const WALK_SPEED = 2.1
 
 /** Who survives a display cap: the ones that want you, then the ones doing something. */
-const ROSTER_RANK = { blocked: 0, waiting: 1, working: 2, celebrating: 3, idle: 4, sleeping: 5 }
+const ROSTER_RANK = { blocked: 0, waiting: 1, talking: 2, working: 2, celebrating: 3, idle: 4, sleeping: 5 }
 const rosterRank = (entry) => ROSTER_RANK[entry.status] ?? 6
 const TURN_RATE = 7.5
 /**
@@ -164,6 +165,9 @@ export class Astronauts {
     this._m3 = new THREE.Matrix4()
     this._m4 = new THREE.Matrix4()
     this._q = new THREE.Quaternion()
+    this._qTilt = new THREE.Quaternion()
+    this._up = new THREE.Vector3(0, 1, 0)
+    this._axisX = new THREE.Vector3(1, 0, 0)
     this._e = new THREE.Euler()
     this._v = new THREE.Vector3()
     this._one = new THREE.Vector3(1, 1, 1)
@@ -316,6 +320,89 @@ export class Astronauts {
     this.headHeight = (restHeadY + P.headUp) * CREW_SCALE
   }
 
+  /**
+   * Replace the astronaut suit with the baked male and female human rigs.
+   * The procedural helmet, visor and backpack stay in the scene but are not drawn.
+   */
+  setHumans(data) {
+    if (!data?.male || !data?.female) return
+    this._disposeHumanMeshes()
+    this.humanData = data
+    this.humanMeshes = []
+    this.headHeight = Math.max(data.male.headHeight, data.female.headHeight)
+
+    for (const rig of [data.male, data.female]) {
+      const frames = new Float32Array(this.capacity)
+      const frameAttrs = []
+      const uniforms = {
+        uBones: { value: rig.boneTexture },
+        uFrameMax: { value: rig.frameCount - 1 },
+      }
+      rig.frameAttrs = frameAttrs
+      rig.uniforms = uniforms
+      rig.meshes = rig.parts.map((part) => {
+        const frameAttr = new THREE.InstancedBufferAttribute(frames, 1)
+        frameAttr.setUsage(THREE.DynamicDrawUsage)
+        frameAttrs.push(frameAttr)
+        return this._humanMesh(part, frameAttr, uniforms)
+      })
+      rig.frameAttr = frameAttrs[0]
+      this.humanMeshes.push(...rig.meshes)
+    }
+
+    for (const mesh of Object.values(this.parts)) {
+      mesh.visible = false
+      mesh.count = 0
+    }
+    this._applyShadowFlags()
+  }
+
+  _humanMesh(part, frameAttr, uniforms) {
+    const geo = part.geometry.clone()
+    // Face blend shapes on the source GLB are not instanced. Leaving them on makes
+    // the renderer read morphTargetInfluences, which InstancedMesh does not have.
+    geo.morphAttributes = {}
+    geo.morphTargetsRelative = false
+    geo.setAttribute('aFrame', frameAttr)
+    const source = Array.isArray(part.material) ? part.material[0] : part.material
+    const material = decorateSkinned(source.clone(), uniforms)
+    material.morphTargets = false
+    material.morphNormals = false
+    const mesh = new THREE.InstancedMesh(geo, material, this.capacity)
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    mesh.count = 0
+    mesh.frustumCulled = false
+    mesh.castShadow = false
+    mesh.receiveShadow = false
+    const white = new THREE.Color(1, 1, 1)
+    for (let i = 0; i < this.capacity; i++) mesh.setColorAt(i, white)
+    mesh.instanceColor.setUsage(THREE.DynamicDrawUsage)
+    const depth = decorateSkinned(
+      new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }),
+      uniforms,
+      { normals: false }
+    )
+    mesh.customDepthMaterial = depth
+    this.group.add(mesh)
+    return mesh
+  }
+
+  _disposeHumanMeshes() {
+    for (const mesh of this.humanMeshes || []) {
+      this.group.remove(mesh)
+      mesh.geometry.dispose()
+      mesh.material.dispose()
+      mesh.customDepthMaterial?.dispose()
+    }
+    this.humanMeshes = null
+    if (!this.humanData) return
+    for (const rig of Object.values(this.humanData)) {
+      rig.meshes = null
+      rig.frameAttr = null
+      rig.frameAttrs = null
+    }
+  }
+
   _disposeCrew() {
     if (!this.crew) return
     this.group.remove(this.crew)
@@ -436,6 +523,7 @@ export class Astronauts {
     }
     // The body is the shadow that matters — it is the whole silhouette.
     if (this.crew) this.crew.castShadow = on
+    for (const mesh of this.humanMeshes || []) mesh.castShadow = on
     this.props?.setShadows(on)
   }
 
@@ -457,7 +545,9 @@ export class Astronauts {
       const wanted = Math.max(64, this.settings.get('maxAgents'))
       if (wanted !== this.capacity) {
         const rig = this.rig
+        const humanData = this.humanData
         this._disposeCrew()
+        this._disposeHumanMeshes()
         for (const mesh of Object.values(this.parts)) {
           this.group.remove(mesh)
           mesh.geometry.dispose()
@@ -466,7 +556,9 @@ export class Astronauts {
         this.group.remove(this.hoverRing, this.selectRing)
         this._buildMeshes(wanted)
         this.rig = null
-        this.setRig(rig)
+        this.humanData = null
+        if (humanData) this.setHumans(humanData)
+        else this.setRig(rig)
         for (const agent of this.agents) {
           agent.index = -1
           agent.colorDirty = true
@@ -520,7 +612,7 @@ export class Astronauts {
         this._updateAgent(existing, entry)
         continue
       }
-      if (trickle) {
+      if (trickle && !entry.known) {
         const agent = this._spawnAgent(entry, true)
         agent.state = 'queued'
         agent.scale = 0
@@ -601,6 +693,8 @@ export class Astronauts {
       walkFaceTime: 0,
       walkFaceHold: 0,
       walkPersonality: (hash(entry.id) >>> 0) / 0x100000000,
+      gender: (hash(entry.id) & 1) === 0 ? 'male' : 'female',
+      headWorld: new THREE.Vector3(),
       suit: SUIT_TONES[(hash(entry.id) >>> 3) % SUIT_TONES.length],
       eye: new THREE.Color(1, 1, 1),
       trim: new THREE.Color(0xffffff),
@@ -922,8 +1016,15 @@ export class Astronauts {
         if (agent.status === 'idle') {
           // Idlers potter around their plot, and `_drift` owns their velocity outright.
           this._drift(agent, dt, elapsed)
+        } else if (agent.status === 'talking' && agent.anchor) {
+          agent.vel.set(0, 0, 0)
+          this._faceToward(agent, agent.anchor, dt)
+          this._settle(agent, dt)
         } else if (agent.status === 'working' && agent.anchor) {
           this._workRound(agent, dt, elapsed)
+          if (this.selected?.id === agent.id && this.viewPoint && (agent.groundSpeed || 0) < 0.12) {
+            this._faceToward(agent, this.viewPoint, dt)
+          }
         } else {
           // Everybody else has arrived and stays: a thread that has gone quiet has sat down
           // on the floor, one that is working is at its building. Velocity is zeroed rather
@@ -931,7 +1032,11 @@ export class Astronauts {
           // velocity is a number only the animation reads, and what it says is "still
           // walking" for a third of a second after the astronaut has visibly stopped.
           agent.vel.set(0, 0, 0)
-          if (agent.status !== 'sleeping') this._faceToward(agent, agent.site, dt)
+          if (agent.status === 'waiting' || (this.selected?.id === agent.id && agent.status !== 'talking')) {
+            if (this.viewPoint) this._faceToward(agent, this.viewPoint, dt)
+          } else if (agent.status !== 'sleeping') {
+            this._faceToward(agent, agent.site, dt)
+          }
           this._settle(agent, dt)
         }
         this._sitePose(agent, dt, elapsed, anim)
@@ -1378,7 +1483,7 @@ export class Astronauts {
    * one instead.
    */
   _animate(agent, dt, anim) {
-    const rig = this.rig
+    const rig = this.humanData?.[agent.gender] || this.rig
     if (!rig) return
 
     // Any real translation belongs in a walk clip. The threshold is low on purpose: what it
@@ -1391,6 +1496,9 @@ export class Astronauts {
     else if (speed > 0.12) key = speed > WALK_SPEED * 1.25 ? 'run' : 'walk'
     else {
       switch (agent.status) {
+        case 'talking':
+          key = 'interact'
+          break
         case 'working':
           // A check raises the arm, holds it, and lowers it, on its own clock.
           if (agent.checkStart >= 0) {
@@ -1441,6 +1549,10 @@ export class Astronauts {
   // ── writing the instance buffers ────────────────────────────────────────────────────
 
   _writeMatrices(elapsed, anim) {
+    if (this.humanData) {
+      this._writeHumans()
+      return
+    }
     const { helmet, visor, pack, antenna, tip, lamp, face, hammer } = this.parts
     const rig = this.rig
     const crew = this.crew
@@ -1571,6 +1683,64 @@ export class Astronauts {
     this._drawnAgents.length = n
   }
 
+  /** Same instance write as the suit crew, but one mesh set per body and no helmet. */
+  _writeHumans() {
+    const root = this._m
+    const bone = this._m3
+    const worn = this._m4
+    const slots = { male: 0, female: 0 }
+    let drawn = 0
+
+    for (const agent of this.agents) {
+      if (drawn >= this.capacity) break
+      if (agent.state === 'gone') continue
+      const s = agent.scale
+      if (s <= 0.001) continue
+      const rig = this.humanData[agent.gender] || this.humanData.male
+      const slot = slots[rig.gender]
+      if (slot >= this.capacity) continue
+      slots[rig.gender] = slot + 1
+
+      this._composeRoot(agent, rig, root)
+
+      for (const mesh of rig.meshes) mesh.setMatrixAt(slot, root)
+      rig.frameAttr.array[slot] = agent.frame
+
+      attachMatrixAt(rig, agent.frame, rig.headSlot ?? 0, bone)
+      worn.multiplyMatrices(root, bone)
+      agent.headWorld.setFromMatrixPosition(worn)
+
+      agent.index = slot
+      this._drawnAgents[drawn] = agent
+      drawn++
+    }
+
+    for (const rig of Object.values(this.humanData)) {
+      const n = slots[rig.gender] || 0
+      for (const mesh of rig.meshes) {
+        mesh.count = n
+        mesh.instanceMatrix.needsUpdate = true
+      }
+      rig.frameAttr.needsUpdate = true
+      for (const attr of rig.frameAttrs) attr.needsUpdate = true
+    }
+    for (const mesh of Object.values(this.parts)) mesh.count = 0
+    this.props?.begin()
+    this.props?.end()
+    this.visibleCount = drawn
+    this._drawnAgents.length = drawn
+  }
+
+  /** World matrix for one agent. Human scans that were authored Z-up carry `rig.tilt`. */
+  _composeRoot(agent, rig, target) {
+    const scale = agent.scale * (rig?.scale || CREW_SCALE)
+    this._qTilt.setFromAxisAngle(this._axisX, rig?.tilt || 0)
+    this._q.setFromAxisAngle(this._up, agent.yaw).multiply(this._qTilt)
+    this._v.set(agent.pos.x, agent.pos.y, agent.pos.z)
+    target.compose(this._v, this._q, this._one.setScalar(scale))
+    this._one.setScalar(1)
+  }
+
   // ── picking ─────────────────────────────────────────────────────────────────────────
 
   /**
@@ -1587,21 +1757,19 @@ export class Astronauts {
 
     for (const agent of this._drawnAgents) {
       if (agent.scale < 0.3 || agent.state === 'gone') continue
-      const scale = agent.scale * CREW_SCALE
-      this._e.set(0, agent.yaw, 0)
-      this._q.setFromEuler(this._e)
-      this._m.compose(agent.pos, this._q, this._one.setScalar(scale))
-      this._one.setScalar(1)
+      const rig = this.humanData?.[agent.gender] || this.rig
+      this._composeRoot(agent, rig, this._m)
+      const pickSlots = rig?.pickSlots || this._pickSlots
       for (let i = 0; i < PICK_PARTS.length; i++) {
         const part = PICK_PARTS[i]
-        if (this.rig && this._pickSlots[i] !== undefined) {
-          attachMatrixAt(this.rig, agent.frame, this._pickSlots[i], this._m2)
+        if (rig && pickSlots?.[i] !== undefined) {
+          attachMatrixAt(rig, agent.frame, pickSlots[i], this._m2)
           v.set(0, part.y || 0, 0).applyMatrix4(this._m2).applyMatrix4(this._m)
         } else {
           // Assets still loading: cover the procedural helmet and the ground beneath it.
           v.set(agent.pos.x, agent.pos.y + (i === 0 ? this.headHeight || 0.75 : 0), agent.pos.z)
         }
-        projectHitPoint(v, part.radius * scale, camera, aspect, body[i])
+        projectHitPoint(v, part.radius * agent.scale * (rig?.scale || CREW_SCALE), camera, aspect, body[i])
       }
       let depth = Infinity
       for (const point of body) if (point.visible) depth = Math.min(depth, point.z)
@@ -1699,6 +1867,7 @@ export class Astronauts {
       mesh.geometry.dispose()
       mesh.material.dispose()
     }
+    this._disposeHumanMeshes()
     this._disposeCrew()
     // The bone texture is the rig's, not this instance's — the rig outlives any one colony.
     this.faceTexture.dispose()

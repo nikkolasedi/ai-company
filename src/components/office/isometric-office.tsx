@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import type { AgentWithDepartment, DepartmentWithAgents } from "@/types";
 import { useOfficeLiveData } from "@/hooks/use-office-live-data";
@@ -9,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ConnectorBar } from "./connector-bar";
 import { LiveActivityPanel } from "./live-activity-panel";
 import { Office2DView } from "./office-2d-view";
+import { OfficeAgentPanel } from "./office-agent-panel";
 import { ViewModeSwitch, type OfficeViewMode } from "./view-mode-switch";
 
 const BotCrossingView = dynamic(
@@ -37,10 +37,11 @@ function ColonyFallback() {
 }
 
 export function IsometricOffice({ departments, initialAgents }: IsometricOfficeProps) {
-  const { agents, events, highlightedAgentId } = useOfficeLiveData(initialAgents);
+  const { agents, events, highlightedAgentId, refresh } = useOfficeLiveData(initialAgents);
   const [viewMode, setViewMode] = useState<OfficeViewMode>("3d");
   const [displayMode, setDisplayMode] = useState<OfficeViewMode>("3d");
   const [webglAvailable, setWebglAvailable] = useState(true);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -63,6 +64,7 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
   }, [viewMode, displayMode]);
 
   const ceoAgent = agents.find((a) => a.isOrchestrator);
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId) ?? null;
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 lg:flex-row lg:gap-4">
@@ -72,8 +74,8 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
             <h2 className="text-lg font-semibold sm:text-xl">Agent Colony</h2>
             <p className="text-xs text-zinc-400 sm:text-sm">
               {displayMode === "3d"
-                ? "Bot Crossing view · Drag to orbit · Click bots to open profiles"
-                : "Tap departments or agents to explore"}
+                ? "Drag to look around. Click a person to see their work."
+                : "Tap a person to see their work"}
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2 sm:gap-3">
@@ -84,14 +86,15 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
             />
             <ConnectorBar />
             {ceoAgent && (
-              <Link
-                href={`/agents/${ceoAgent.id}`}
+              <button
+                type="button"
+                onClick={() => setSelectedAgentId(ceoAgent.id)}
                 className="flex min-w-0 items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-1.5 text-sm sm:px-4 sm:py-2"
               >
                 <span className="font-medium text-indigo-300">CEO</span>
                 <span className="hidden truncate text-zinc-400 sm:inline">{ceoAgent.name}</span>
                 <Badge status={ceoAgent.status} />
-              </Link>
+              </button>
             )}
           </div>
         </div>
@@ -103,6 +106,7 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
                 departments={departments}
                 agents={agents}
                 highlightedAgentId={highlightedAgentId}
+                onSelectAgent={setSelectedAgentId}
               />
             </div>
           ) : (
@@ -111,8 +115,19 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
                 agents={agents}
                 events={events}
                 highlightedAgentId={highlightedAgentId}
+                selectedAgentId={selectedAgentId}
+                onSelectAgent={setSelectedAgentId}
               />
             </Suspense>
+          )}
+          {selectedAgent && (
+            <OfficeAgentPanel
+              agent={selectedAgent}
+              colleagues={agents}
+              onClose={() => setSelectedAgentId(null)}
+              onChanged={refresh}
+              onSelect={setSelectedAgentId}
+            />
           )}
         </div>
       </div>

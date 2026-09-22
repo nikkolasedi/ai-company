@@ -199,6 +199,7 @@ model Agent {
   agentRole        AgentRole?      @relation(fields: [agentRoleId], references: [id])
   organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tasks            Task[]          @relation("AssignedAgent")
+  handoffTasks     Task[]          @relation("HandoffTarget")
   messages         Message[]
   memories         AgentMemory[]
   metrics          AgentMetric[]
@@ -274,10 +275,15 @@ model Task {
   completedAt    DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   workflow       Workflow?    @relation(fields: [workflowId], references: [id])
+  handoffAgentId String?
+  handoffNote    String?
+  handoffReply   String?
   assignedAgent  Agent?       @relation("AssignedAgent", fields: [assignedAgentId], references: [id])
+  handoffAgent   Agent?       @relation("HandoffTarget", fields: [handoffAgentId], references: [id])
   execution      Execution?   @relation(fields: [executionId], references: [id])
   messages       Message[]
   approvals      Approval[]
+  grants         TaskGrant[]
 }
 
 model Execution {
@@ -379,8 +385,22 @@ model Connector {
   updatedAt      DateTime        @updatedAt
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tools          Tool[]
+  grants         TaskGrant[]
 
   @@unique([organizationId, provider])
+}
+
+model TaskGrant {
+  id          String          @id @default(cuid())
+  permission  PermissionLevel @default(DRAFT)
+  taskId      String
+  connectorId String
+  createdAt   DateTime        @default(now())
+  task        Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  connector   Connector       @relation(fields: [connectorId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, connectorId])
+  @@index([taskId])
 }
 
 model Tool {
