@@ -229,28 +229,29 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
   const ceoAgent = agents.find((a) => a.isOrchestrator);
 
   return (
-    <div className="flex h-full gap-4">
-      <div className="relative flex-1 overflow-auto rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-6">
-        <div className="mb-4 flex items-center justify-between">
+    <div className="flex h-full flex-col gap-4 lg:flex-row">
+      <div className="relative min-w-0 flex-1 overflow-hidden rounded-xl border border-zinc-800 bg-gradient-to-br from-zinc-900 to-zinc-950 p-3 sm:p-4 lg:p-6">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold">Virtual Office</h2>
+            <h2 className="text-lg font-semibold sm:text-xl">Virtual Office</h2>
             <p className="text-sm text-zinc-400">
-              Click departments or agents to explore
+              Tap departments or agents to explore
             </p>
           </div>
           {ceoAgent && (
             <Link
               href={`/agents/${ceoAgent.id}`}
-              className="flex items-center gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-4 py-2 text-sm"
+              className="flex w-full items-center justify-between gap-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-sm sm:w-auto sm:justify-start sm:px-4"
             >
               <span className="font-medium text-indigo-300">CEO</span>
-              <span className="text-zinc-400">{ceoAgent.name}</span>
+              <span className="truncate text-zinc-400">{ceoAgent.name}</span>
               <Badge status={ceoAgent.status} />
             </Link>
           )}
         </div>
 
-        <div className="relative mx-auto" style={{ width: 900, height: 700 }}>
+        <div className="overflow-x-auto pb-2">
+        <div className="relative mx-auto min-w-[900px]" style={{ width: 900, height: 700 }}>
           <svg
             className="absolute inset-0 opacity-20"
             width="900"
@@ -278,11 +279,12 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
             />
           ))}
         </div>
+        </div>
       </div>
 
-      <div className="w-80 shrink-0 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+      <div className="w-full shrink-0 rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 sm:p-4 lg:w-80">
         <h3 className="mb-3 text-sm font-semibold text-zinc-300">Live Activity</h3>
-        <div className="space-y-2 overflow-y-auto" style={{ maxHeight: "calc(100vh - 200px)" }}>
+        <div className="max-h-64 space-y-2 overflow-y-auto sm:max-h-80 lg:max-h-[calc(100vh-200px)]">
           {events.length === 0 ? (
             <p className="text-sm text-zinc-500">
               No live events yet. Submit a goal in Command Center to see agents work.

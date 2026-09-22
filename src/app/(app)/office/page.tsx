@@ -13,7 +13,7 @@ export default async function OfficePage() {
   ]);
 
   return (
-    <div className="h-[calc(100vh-3rem)]">
+    <div className="min-h-[calc(100dvh-8rem)] lg:min-h-[calc(100vh-3rem)]">
       <IsometricOffice departments={departments} initialAgents={agents} />
     </div>
   );
