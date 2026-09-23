@@ -31,30 +31,38 @@ const MAIL = { count: 3, ground: true }
 export const PLANETS = {
   office: {
     id: 'office',
-    name: 'Studio',
-    blurb: 'Warm open-plan floor, glass atrium, short shadows.',
+    name: 'Campus',
+    blurb: 'Courtyard desks, a shuttle stop, lawns and neighbouring offices.',
     indoor: true,
-    ground: { low: 0x8a6d45, high: 0xb08958, tint: 0xc4a06a },
-    rock: 0x6b4e32,
-    horizon: 0x8a96a8,
-    sky: { top: 0x6f86a3, bottom: 0xb7c4d4 },
-    fog: { color: 0xb8c2d0, near: 110, far: 240 },
-    sun: { color: 0xfff2dc, intensity: 1.15, night: 0.7 },
-    ambient: { sky: 0xc5d0de, ground: 0x8a7354, intensity: 0.72 },
-    atmosphere: 0.85,
+    campus: true,
+    ground: { low: 0x3a6a32, high: 0x6d9a4a, tint: 0x86ae5c },
+    rock: 0x6b6f63,
+    horizon: 0x8eb4d4,
+    sky: { top: 0x4a86c8, bottom: 0xc8dcec },
+    fog: { color: 0xb4c8d8, near: 130, far: 290 },
+    sun: { color: 0xfff2dc, intensity: 1.85, night: 0.18 },
+    ambient: { sky: 0xb0c8e0, ground: 0x5a7048, intensity: 0.88 },
+    atmosphere: 0.95,
     craters: 0,
-    roughness: 0.08,
+    roughness: 0.32,
     scatter: 'office',
-    companion: null,
+    companion: { name: 'Moon', color: 0xdcd8cc, size: 2.4, glow: 0xfff6e0 },
     dust: 0,
-    weather: [{ kind: 'motes', rate: 0.55 }],
-    clouds: { amount: 0.12, color: 0xffffff, speed: 0.25 },
-    fauna: { drones: MAIL },
+    weather: [{ kind: 'motes', rate: 0.22 }],
+    clouds: { amount: 0.35, color: 0xffffff, speed: 0.4 },
+    grass: { root: 0x2f5a34, tip: 0x7fbf55, height: [0.22, 0.48], sway: 0.45 },
+    fauna: {
+      birds: { kind: 'swallow', count: 6, altitude: [8, 16], colors: [0x3a3a4a, 0x2a2a3a], size: 0.85 },
+      drones: MAIL,
+    },
     audio: {
-      beds: [{ sound: 'lunar-silence', gain: 0.25 }],
+      beds: [
+        { sound: 'wind-soft', gain: 0.32 },
+        { sound: 'meadow-birds', gain: 0.28, night: 0 },
+      ],
       events: [],
     },
-    grade: { saturation: 1.02, warmth: 0.07 },
+    grade: { saturation: 1.04, warmth: 0.05 },
   },
   moon: {
     id: 'moon',
@@ -636,7 +644,7 @@ export function createTerrain(planet, detail, seed = 1337) {
     // Darken the far field so the eye settles on the colony and the hills read as a
     // silhouette rather than as more ground competing with the plots for attention.
     // Gentler than it was: a bright little world should stay bright to its edges.
-    if (planet.indoor) {
+    if (planet.indoor && !planet.campus) {
       const plank = Math.abs(Math.floor((x + 400) / 3.2) % 2)
       const groove = Math.abs(((x + 400) % 3.2) - 1.6) < 0.08
       const oakA = new THREE.Color(0x9a7848)
@@ -657,11 +665,11 @@ export function createTerrain(planet, detail, seed = 1337) {
 
   const mat = new THREE.MeshStandardMaterial({
     vertexColors: true,
-    roughness: planet.indoor ? 0.62 : 0.97,
+    roughness: planet.indoor && !planet.campus ? 0.62 : 0.97,
     metalness: 0,
     // Flat-ish shading keeps the low-poly read; a dielectric surface with no spec highlight
     // is what sells "dust" rather than "plastic".
-    envMapIntensity: planet.indoor ? 0.45 : 0.3,
+    envMapIntensity: planet.indoor && !planet.campus ? 0.45 : 0.3,
   })
   const mesh = new THREE.Mesh(geo, mat)
   mesh.receiveShadow = true
@@ -737,7 +745,7 @@ export function createTerrain(planet, detail, seed = 1337) {
  * coast does the same past a line, dunes lay long ridges over everything.
  */
 function sampleHeight(x, z, field, planet) {
-  if (planet.indoor) {
+  if (planet.indoor && !planet.campus) {
     const { noise } = field
     return fbm(noise, x * 0.08, z * 0.08, 2) * 0.035 * (planet.roughness || 0.08)
   }
@@ -989,13 +997,15 @@ const SCATTER = {
     { part: 'Rock_1_D_Color1', weight: 2, size: [0.4, 0.9], sink: 0.3, tint: true },
   ],
   office: [
-    { part: 'plant_bushLarge', kit: N, weight: 3, size: [0.55, 0.95], sink: 0.04, upright: true },
-    { part: 'plant_bushDetailed', kit: N, weight: 3, size: [0.5, 0.85], sink: 0.04, upright: true },
-    { part: 'plant_flatShort', kit: N, weight: 2, size: [0.7, 1.1], sink: 0.03, upright: true },
-    { part: 'Bush_1_E_Color1', weight: 3, size: [0.35, 0.65], sink: 0.05, upright: true },
-    { part: 'Bush_3_B_Color1', weight: 2, size: [0.35, 0.6], sink: 0.05, upright: true },
-    { part: 'flower_purpleA', kit: N, weight: 1, size: [0.7, 1.0], sink: 0.04, upright: true },
-    { part: 'flower_yellowA', kit: N, weight: 1, size: [0.7, 1.0], sink: 0.04, upright: true },
+    { part: 'Tree_1_A_Color1', weight: 2, size: [0.55, 0.9], sink: 0.02, upright: true },
+    { part: 'Tree_3_A_Color1', weight: 2, size: [0.5, 0.85], sink: 0.02, upright: true },
+    { part: 'plant_bushLarge', kit: N, weight: 3, size: [0.7, 1.2], sink: 0.04, upright: true },
+    { part: 'plant_bushDetailed', kit: N, weight: 3, size: [0.6, 1.05], sink: 0.04, upright: true },
+    { part: 'plant_flatShort', kit: N, weight: 2, size: [0.8, 1.3], sink: 0.03, upright: true },
+    { part: 'Bush_1_E_Color1', weight: 3, size: [0.45, 0.85], sink: 0.05, upright: true },
+    { part: 'Bush_3_B_Color1', weight: 2, size: [0.45, 0.8], sink: 0.05, upright: true },
+    { part: 'flower_purpleA', kit: N, weight: 1, size: [0.8, 1.15], sink: 0.04, upright: true },
+    { part: 'flower_yellowA', kit: N, weight: 1, size: [0.8, 1.15], sink: 0.04, upright: true },
   ],
   sakura: [
     { part: 'tree_default_sakura', kit: N, weight: 3, size: [1.4, 2.2], sink: 0.03, upright: true },
@@ -1034,7 +1044,7 @@ export function createScatter(planet, density, keepClear = [], seed = 4242, insi
   const group = new THREE.Group()
   group.name = 'scatter'
   // Islands have much less usable ground. Concentrate a smaller budget into groves.
-  const count = Math.round(SCATTER_BUDGET * THREE.MathUtils.clamp(density, 0, 1) * (planet.indoor ? 0.22 : planet.shape === 'island' ? 0.5 : 1))
+  const count = Math.round(SCATTER_BUDGET * THREE.MathUtils.clamp(density, 0, 1) * (planet.campus ? 0.45 : planet.indoor ? 0.22 : planet.shape === 'island' ? 0.5 : 1))
   if (count <= 0) return group
 
   const rand = mulberry(seed)
@@ -1093,7 +1103,7 @@ export function createScatter(planet, density, keepClear = [], seed = 4242, insi
     // actually look at is the ring just outside the plots, and a strict area-uniform spread
     // leaves it thinner than the far field it is competing with.
     const a = rand() * Math.PI * 2
-    let d = 9 + Math.pow(rand(), 0.58) * (planet.indoor ? 55 : 150)
+    let d = 9 + Math.pow(rand(), 0.58) * (planet.campus ? 120 : planet.indoor ? 55 : 150)
     let x = Math.cos(a) * d
     let z = Math.sin(a) * d
     // Mixed groups read as vegetation; isolated tiny trees read as scattered props.
@@ -1127,7 +1137,7 @@ export function createScatter(planet, density, keepClear = [], seed = 4242, insi
     }
 
     // Far-field props are allowed to be much bigger, which reads as distance.
-    const far = planet.indoor ? 0 : THREE.MathUtils.smoothstep(d, COLONY_RADIUS, 130)
+    const far = planet.indoor && !planet.campus ? 0 : THREE.MathUtils.smoothstep(d, COLONY_RADIUS, 130)
     const [lo, hi] = kind.size
     const s = (lo + rand() * (hi - lo)) * (1 + far * 1.9)
 

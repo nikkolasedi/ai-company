@@ -3,7 +3,8 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { DECK_TEXTURE_SCALE, KERB_UV, deckSurface, kerbSurface, rugSurface, railSurface } from './surfaces.js'
 import { atlasTexture, hasPart, part } from './kit.js'
 import { mulberry } from './planet.js'
-import { officeClutterGeometry, OFFICE_CLUTTER } from './office-furniture.js'
+import { officeClutterGeometry, OFFICE_CLUTTER, createOfficeBuilding } from './office-furniture.js'
+import { departmentClutter, departmentLandmark } from './departments.js'
 import { withCurve } from '../core/curve.js'
 import { OVERLAY_LAYER } from '../core/engine.js'
 import { BUILDING_RADIUS } from './buildings.js'
@@ -361,13 +362,14 @@ function hexPrism(radius, height) {
 // ── plot mesh ─────────────────────────────────────────────────────────────────────────
 
 export class Plot {
-  constructor({ id, name, index, cells, accent, style = 'office' }) {
+  constructor({ id, name, index, cells, accent, style = 'office', department = id }) {
     this.id = id
     this.name = name
     this.index = index
     this.cells = cells
     this.accent = accent
     this.style = style
+    this.department = department
     this.cellKeys = new Set(cells.map((c) => key(c.q, c.r)))
 
     // The plot's origin is its **root** tile — the one it was seeded on and never gives up
@@ -409,6 +411,7 @@ export class Plot {
     this._buildBorder()
     this._buildPosts()
     this.slots = this._buildSlots()
+    this._buildLandmark()
     this._buildClutter()
   }
 
@@ -440,7 +443,7 @@ export class Plot {
     // at the plot boundary just looks like a hole.
     const office = this.style === 'office'
     const color = office
-      ? new THREE.Color(this.accent).offsetHSL(0, -0.12, 0.06).multiplyScalar(0.92)
+      ? new THREE.Color(this.accent).offsetHSL(0, -0.08, 0.04).multiplyScalar(0.95)
       : new THREE.Color(this.accent).offsetHSL(0, -0.38, 0).multiplyScalar(0.9)
     const plate = office ? rugSurface() : deckSurface()
     this.deck = new THREE.Mesh(
@@ -526,19 +529,19 @@ export class Plot {
     this.localCenters.forEach(({ x, z }, i) => {
       const [px, pz] = corner(x, z, (i * 2) % 6, TILE * (office ? 0.68 : 0.72))
       if (office) {
-        const pole = new THREE.CylinderGeometry(0.03, 0.04, 1.15, 6)
-        pole.translate(px, DECK_TOP + 0.58, pz)
+        const pole = new THREE.CylinderGeometry(0.04, 0.05, 1.55, 6)
+        pole.translate(px, DECK_TOP + 0.78, pz)
         posts.push(pole)
-        const shade = new THREE.CylinderGeometry(0.18, 0.12, 0.2, 10)
-        shade.translate(px, DECK_TOP + 1.22, pz)
+        const shade = new THREE.CylinderGeometry(0.24, 0.16, 0.26, 10)
+        shade.translate(px, DECK_TOP + 1.62, pz)
         lamps.push(shade)
         if (i % 2 === 0) {
-          const arm = new THREE.CylinderGeometry(0.018, 0.018, 0.7, 5)
+          const arm = new THREE.CylinderGeometry(0.02, 0.02, 0.85, 5)
           arm.rotateZ(Math.PI / 2)
-          arm.translate(px + 0.28, DECK_TOP + 1.55, pz)
+          arm.translate(px + 0.34, DECK_TOP + 1.95, pz)
           posts.push(arm)
-          const pendant = new THREE.SphereGeometry(0.1, 8, 6)
-          pendant.translate(px + 0.62, DECK_TOP + 1.42, pz)
+          const pendant = new THREE.SphereGeometry(0.13, 8, 6)
+          pendant.translate(px + 0.76, DECK_TOP + 1.78, pz)
           lamps.push(pendant)
         }
       } else {
@@ -561,11 +564,11 @@ export class Plot {
     )
     poleMesh.castShadow = true
     this.lampMaterial = new THREE.MeshBasicMaterial({
-      color: office ? 0xffe2b0 : this.accent,
+      color: this.accent,
       toneMapped: true,
     })
     this.lamps = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(lamps), this.lampMaterial)
-    this._lampBase = new THREE.Color(office ? 0xffe2b0 : this.accent)
+    this._lampBase = new THREE.Color(this.accent)
     this.group.add(poleMesh, this.lamps)
     posts.forEach((g) => g.dispose())
     lamps.forEach((g) => g.dispose())
@@ -584,7 +587,7 @@ export class Plot {
   _buildClutter() {
     const office = this.style === 'office'
     const props = office
-      ? OFFICE_CLUTTER
+      ? departmentClutter(this.department)
       : ['containers_A', 'containers_B', 'containers_C', 'containers_D', 'cargo_A', 'cargo_B', 'cargo_A_packed', 'cargo_B_packed', 'lights']
     if (!office && !props.every((n) => hasPart(n))) return
 
@@ -604,7 +607,7 @@ export class Plot {
 
       for (const { a, r } of spots) {
         const name = props[Math.floor(rand() * props.length)]
-        const geo = office ? officeClutterGeometry(name, rand) : part(name)
+        const geo = office ? officeClutterGeometry(name, rand, this.accent) : part(name)
         const s = office ? 1 : name === 'lights' ? 1.1 : 1.35
         if (s !== 1) geo.scale(s, s, s)
         geo.rotateY(rand() * Math.PI * 2)
@@ -637,6 +640,18 @@ export class Plot {
     this.clutter.castShadow = true
     this.clutter.receiveShadow = true
     this.group.add(this.clutter)
+  }
+
+  /** One department landmark on the first cell centre — TV, safe, board, rack. */
+  _buildLandmark() {
+    if (this.style !== 'office' || !this.localCenters[0]) return
+    const kind = departmentLandmark(this.department)
+    const mesh = createOfficeBuilding({ seed: hashString(this.id) + 91, accent: this.accent, kind })
+    const { x, z } = this.localCenters[0]
+    mesh.position.set(x, DECK_TOP, z)
+    mesh.userData.setProgress(1)
+    this.group.add(mesh)
+    this.landmark = mesh
   }
 
   /**

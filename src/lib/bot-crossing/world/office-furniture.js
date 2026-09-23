@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { mulberry } from './planet.js'
 import { withCurve } from '../core/curve.js'
 
-const FIT_RADIUS = 2
+const FIT_RADIUS = 2.6
 
 /**
  * Warm-studio office furniture. One merged mesh per workstation, same progress
@@ -108,53 +108,54 @@ function roundBox(w, h, d, r = 0.04) {
 }
 
 function standingDesk(c, y = 0) {
-  const topY = y + 1.08
-  c.add(roundBox(1.55, 0.05, 0.72, 0.02), OAK, { y: topY })
-  c.add(roundBox(0.55, 0.05, 0.42, 0.02), OAK, { x: 0.78, y: topY, z: -0.08 })
+  const topY = y + 1.14
+  c.add(roundBox(1.95, 0.06, 0.92, 0.03), OAK, { y: topY })
+  c.add(roundBox(0.7, 0.06, 0.52, 0.03), OAK, { x: 0.95, y: topY, z: -0.1 })
   for (const [x, z] of [
-    [-0.68, -0.28],
-    [0.68, -0.28],
-    [-0.68, 0.28],
-    [0.95, 0.12],
+    [-0.86, -0.36],
+    [0.86, -0.36],
+    [-0.86, 0.36],
+    [1.18, 0.16],
   ]) {
-    c.add(box(0.045, 1.06, 0.045), METAL, { x, y: y + 0.53, z })
+    c.add(box(0.055, 1.12, 0.055), METAL, { x, y: y + 0.56, z })
   }
   return topY
 }
 
 function monitor(c, x, y, z, yaw = 0) {
-  c.add(cyl(0.07, 0.09, 0.06, 8), METAL, { x, y: y + 0.03, z, ry: yaw })
-  c.add(box(0.03, 0.22, 0.03), FRAME, { x, y: y + 0.16, z, ry: yaw })
-  c.add(box(0.52, 0.34, 0.03), FRAME, { x, y: y + 0.36, z, ry: yaw })
-  c.add(box(0.46, 0.28, 0.01), SCREEN, { x, y: y + 0.36, z: z + 0.018, ry: yaw, emissive: 0.85 })
+  c.add(cyl(0.09, 0.11, 0.07, 8), METAL, { x, y: y + 0.04, z, ry: yaw })
+  c.add(box(0.04, 0.28, 0.04), FRAME, { x, y: y + 0.2, z, ry: yaw })
+  c.add(box(0.68, 0.44, 0.04), FRAME, { x, y: y + 0.46, z, ry: yaw })
+  c.add(box(0.6, 0.36, 0.012), SCREEN, { x, y: y + 0.46, z: z + 0.024, ry: yaw, emissive: 0.85 })
 }
 
 function laptop(c, x, y, z, yaw = 0) {
-  c.add(roundBox(0.32, 0.018, 0.22, 0.01), FRAME, { x, y: y + 0.01, z, ry: yaw })
-  const lid = box(0.32, 0.2, 0.012)
+  c.add(roundBox(0.4, 0.02, 0.28, 0.012), FRAME, { x, y: y + 0.012, z, ry: yaw })
+  const lid = box(0.4, 0.26, 0.014)
   lid.rotateX(-0.55)
-  c.add(lid, FRAME, { x, y: y + 0.12, z: z - 0.08, ry: yaw })
-  const screen = box(0.28, 0.16, 0.006)
+  c.add(lid, FRAME, { x, y: y + 0.15, z: z - 0.1, ry: yaw })
+  const screen = box(0.35, 0.2, 0.008)
   screen.rotateX(-0.55)
-  c.add(screen, SCREEN, { x, y: y + 0.12, z: z - 0.07, ry: yaw, emissive: 0.7 })
+  c.add(screen, SCREEN, { x, y: y + 0.15, z: z - 0.088, ry: yaw, emissive: 0.7 })
 }
 
-function chair(c, x, z, yaw = 0) {
-  c.add(cyl(0.16, 0.18, 0.04, 8), METAL, { x, y: 0.05, z, ry: yaw })
-  c.add(cyl(0.03, 0.03, 0.28, 6), METAL, { x, y: 0.2, z, ry: yaw })
-  c.add(roundBox(0.32, 0.05, 0.32, 0.03), CHAIR, { x, y: 0.36, z, ry: yaw })
-  c.add(roundBox(0.3, 0.38, 0.04, 0.02), CHAIR, { x, y: 0.56, z: z - 0.14, ry: yaw })
+function chair(c, x, z, yaw = 0, accent = CHAIR) {
+  c.add(cyl(0.2, 0.22, 0.05, 8), METAL, { x, y: 0.06, z, ry: yaw })
+  c.add(cyl(0.04, 0.04, 0.34, 6), METAL, { x, y: 0.24, z, ry: yaw })
+  c.add(roundBox(0.4, 0.06, 0.4, 0.03), accent, { x, y: 0.44, z, ry: yaw })
+  c.add(roundBox(0.38, 0.48, 0.05, 0.03), accent, { x, y: 0.7, z: z - 0.18, ry: yaw })
 }
 
 function potPlant(c, x, z, scale = 1, tall = false) {
-  c.add(cyl(0.13 * scale, 0.16 * scale, 0.28 * scale, 8), POT, { x, y: 0.14 * scale, z })
-  c.add(sphere(0.22 * scale, 8, 6), LEAF, { x, y: (tall ? 0.62 : 0.48) * scale, z })
-  c.add(sphere(0.14 * scale, 6, 5), LEAF_DARK, { x: x + 0.1 * scale, y: (tall ? 0.72 : 0.56) * scale, z: z + 0.04 * scale })
-  c.add(sphere(0.12 * scale, 6, 5), LEAF, { x: x - 0.08 * scale, y: (tall ? 0.68 : 0.54) * scale, z: z - 0.05 * scale })
+  const s = scale * 1.25
+  c.add(cyl(0.16 * s, 0.2 * s, 0.34 * s, 8), POT, { x, y: 0.17 * s, z })
+  c.add(sphere(0.28 * s, 8, 6), LEAF, { x, y: (tall ? 0.78 : 0.6) * s, z })
+  c.add(sphere(0.18 * s, 6, 5), LEAF_DARK, { x: x + 0.12 * s, y: (tall ? 0.9 : 0.7) * s, z: z + 0.05 * s })
+  c.add(sphere(0.15 * s, 6, 5), LEAF, { x: x - 0.1 * s, y: (tall ? 0.86 : 0.68) * s, z: z - 0.06 * s })
   if (tall) {
-    c.add(cyl(0.02 * scale, 0.03 * scale, 0.7 * scale, 5), WALNUT, { x, y: 0.55 * scale, z })
-    c.add(sphere(0.18 * scale, 7, 5), LEAF, { x: x + 0.06 * scale, y: 0.95 * scale, z })
-    c.add(sphere(0.16 * scale, 6, 5), LEAF_DARK, { x: x - 0.08 * scale, y: 1.02 * scale, z: z + 0.05 * scale })
+    c.add(cyl(0.03 * s, 0.04 * s, 0.9 * s, 5), WALNUT, { x, y: 0.7 * s, z })
+    c.add(sphere(0.24 * s, 7, 5), LEAF, { x: x + 0.08 * s, y: 1.2 * s, z })
+    c.add(sphere(0.2 * s, 6, 5), LEAF_DARK, { x: x - 0.1 * s, y: 1.28 * s, z: z + 0.06 * s })
   }
 }
 
@@ -164,35 +165,35 @@ function succulent(c, x, y, z) {
 }
 
 const KINDS = {
-  habitat(c) {
+  habitat(c, _rand, accent) {
     const top = standingDesk(c)
-    monitor(c, -0.28, top, -0.18)
-    monitor(c, 0.28, top, -0.18)
-    laptop(c, 0.02, top, 0.12)
-    c.add(box(0.34, 0.012, 0.12), DARK, { y: top + 0.01, z: 0.18 })
-    succulent(c, 0.62, top, 0.18)
-    chair(c, 0, 0.55, Math.PI)
+    monitor(c, -0.34, top, -0.22)
+    monitor(c, 0.34, top, -0.22)
+    laptop(c, 0.02, top, 0.16)
+    c.add(box(0.4, 0.014, 0.14), DARK, { y: top + 0.012, z: 0.22 })
+    succulent(c, 0.78, top, 0.22)
+    chair(c, 0, 0.7, Math.PI, accent)
     return 'Standing desk'
   },
 
-  lab(c) {
+  lab(c, _rand, accent) {
     const top = standingDesk(c, 0)
-    monitor(c, -0.18, top, -0.16)
-    laptop(c, 0.28, top, 0.08)
-    c.add(box(0.22, 0.08, 0.16), WHITE, { x: 0.55, y: top + 0.05, z: -0.12 })
-    succulent(c, -0.62, top, 0.16)
-    chair(c, 0.05, 0.52, Math.PI)
+    monitor(c, -0.22, top, -0.2)
+    laptop(c, 0.34, top, 0.1)
+    c.add(box(0.28, 0.1, 0.2), WHITE, { x: 0.7, y: top + 0.06, z: -0.14 })
+    succulent(c, -0.78, top, 0.2)
+    chair(c, 0.05, 0.66, Math.PI, accent)
     return 'Lab desk'
   },
 
-  workshop(c, rand) {
-    c.add(cyl(1.05, 1.05, 0.06, 24), OAK, { y: 0.74 })
-    c.add(cyl(0.1, 0.16, 0.72, 8), METAL, { y: 0.36 })
-    c.add(cyl(0.28, 0.28, 0.04, 16), WALNUT, { y: 0.78 })
+  workshop(c, rand, accent) {
+    c.add(cyl(1.28, 1.28, 0.07, 24), OAK, { y: 0.78 })
+    c.add(cyl(0.12, 0.18, 0.76, 8), METAL, { y: 0.38 })
+    c.add(cyl(0.34, 0.34, 0.05, 16), WALNUT, { y: 0.84 })
     const seats = 6
     for (let i = 0; i < seats; i++) {
       const a = (i / seats) * Math.PI * 2 + rand() * 0.08
-      chair(c, Math.cos(a) * 1.42, Math.sin(a) * 1.42, a + Math.PI)
+      chair(c, Math.cos(a) * 1.72, Math.sin(a) * 1.72, a + Math.PI, accent)
     }
     return 'Meeting table'
   },
@@ -256,16 +257,80 @@ const KINDS = {
     return 'Floor lamp'
   },
 
-  pad(c, rand) {
-    c.add(cyl(0.55, 0.55, 0.06, 20), OAK, { y: 0.32 })
-    c.add(cyl(0.08, 0.1, 0.3, 8), METAL, { y: 0.16 })
-    for (const side of [-0.85, 0.85]) {
-      c.add(roundBox(0.62, 0.12, 0.58, 0.04), CHAIR, { x: side, y: 0.28, z: 0.05, ry: side > 0 ? -0.2 : 0.2 })
-      c.add(roundBox(0.58, 0.32, 0.08, 0.03), CHAIR, { x: side, y: 0.5, z: -0.2, ry: side > 0 ? -0.2 : 0.2 })
+  pad(c, rand, accent) {
+    c.add(cyl(0.68, 0.68, 0.07, 20), OAK, { y: 0.36 })
+    c.add(cyl(0.1, 0.12, 0.34, 8), METAL, { y: 0.18 })
+    for (const side of [-1.05, 1.05]) {
+      c.add(roundBox(0.76, 0.14, 0.7, 0.04), accent || CHAIR, { x: side, y: 0.32, z: 0.06, ry: side > 0 ? -0.2 : 0.2 })
+      c.add(roundBox(0.7, 0.4, 0.1, 0.03), accent || CHAIR, { x: side, y: 0.58, z: -0.24, ry: side > 0 ? -0.2 : 0.2 })
     }
-    c.add(cyl(0.08, 0.08, 0.1, 8), WHITE, { y: 0.4, z: 0.08 })
-    if (rand() > 0.4) potPlant(c, 0, -0.7, 0.55)
+    c.add(cyl(0.1, 0.1, 0.12, 8), WHITE, { y: 0.46, z: 0.1 })
+    if (rand() > 0.4) potPlant(c, 0, -0.85, 0.7)
     return 'Lounge'
+  },
+
+  tvWall(c, _rand, accent) {
+    c.add(roundBox(0.28, 1.55, 2.2, 0.03), DARK, { y: 0.82, z: 0 })
+    c.add(box(0.08, 1.15, 1.85), SCREEN, { x: 0.16, y: 0.92, emissive: 0.95 })
+    c.add(box(1.7, 0.06, 0.08), accent, { x: 0.18, y: 1.52 })
+    c.add(roundBox(0.9, 0.08, 0.42, 0.02), OAK, { x: 0.7, y: 0.42 })
+    potPlant(c, 1.15, 0.55, 0.7)
+    return 'Campaign wall'
+  },
+
+  safe(c, _rand, accent) {
+    c.add(roundBox(0.95, 1.05, 0.7, 0.04), 0x3a3f46, { y: 0.54 })
+    c.add(box(0.72, 0.82, 0.04), METAL, { z: 0.36, y: 0.58 })
+    c.add(cyl(0.08, 0.08, 0.05, 10), accent, { z: 0.4, y: 0.62, rx: Math.PI / 2 })
+    c.add(roundBox(0.55, 0.18, 0.4, 0.02), 0xc9a24a, { y: 1.16 })
+    c.add(box(0.28, 0.06, 0.2), DARK, { y: 1.28 })
+    return 'Safe'
+  },
+
+  whiteboard(c, _rand, accent) {
+    c.add(box(0.08, 1.35, 1.7), WHITE, { y: 1.05 })
+    c.add(box(0.06, 1.2, 1.55), 0xeef4f8, { x: 0.03, y: 1.05 })
+    c.add(box(1.55, 0.04, 0.05), accent, { x: 0.04, y: 1.68 })
+    c.add(box(0.22, 0.04, 0.08), 0x2a6ad4, { x: 0.08, y: 1.15, z: 0.2 })
+    c.add(box(0.18, 0.04, 0.08), 0xe24a4a, { x: 0.08, y: 0.95, z: -0.15 })
+    c.add(roundBox(0.7, 0.72, 0.18, 0.02), OAK, { x: 0.55, y: 0.38, z: 0.55 })
+    return 'Whiteboard'
+  },
+
+  serverRack(c, _rand, accent) {
+    c.add(roundBox(0.7, 1.55, 0.85, 0.03), DARK, { y: 0.8 })
+    for (let i = 0; i < 5; i++) {
+      c.add(box(0.58, 0.12, 0.04), i % 2 ? accent : METAL, { z: 0.42, y: 0.32 + i * 0.24, emissive: i % 2 ? 0.4 : 0 })
+    }
+    c.add(box(0.08, 0.08, 0.08), 0x3ae86a, { x: 0.22, y: 1.48, z: 0.4, emissive: 0.8 })
+    return 'Server rack'
+  },
+
+  kanban(c, _rand, accent) {
+    c.add(roundBox(0.12, 1.45, 1.85, 0.02), WALNUT, { y: 0.95 })
+    c.add(box(0.04, 1.2, 1.65), 0xf3efe6, { x: 0.08, y: 0.98 })
+    for (let col = 0; col < 3; col++) {
+      for (let row = 0; row < 3; row++) {
+        c.add(box(0.03, 0.16, 0.28), col === 1 ? accent : 0xf0d27a, {
+          x: 0.12,
+          y: 1.35 - row * 0.28,
+          z: -0.5 + col * 0.5,
+        })
+      }
+    }
+    return 'Planner board'
+  },
+
+  headsetStation(c, _rand, accent) {
+    c.add(roundBox(1.35, 0.08, 0.7, 0.03), OAK, { y: 0.92 })
+    c.add(roundBox(1.2, 0.82, 0.6, 0.03), CREAM, { y: 0.45 })
+    c.add(cyl(0.12, 0.12, 0.08, 10), DARK, { x: -0.35, y: 1.02 })
+    c.add(cyl(0.04, 0.04, 0.22, 6), METAL, { x: -0.35, y: 1.16 })
+    const ring = new THREE.TorusGeometry(0.12, 0.025, 6, 12)
+    ring.rotateX(Math.PI / 2)
+    c.add(ring, accent, { x: -0.35, y: 1.28 })
+    c.add(box(0.32, 0.22, 0.04), SCREEN, { x: 0.28, y: 1.18, z: -0.12, emissive: 0.7 })
+    return 'Support desk'
   },
 }
 
@@ -336,7 +401,7 @@ export function createOfficeBuilding({ seed = 1, accent = 0xc96442, kind = null 
   for (let i = 0; i < positions.count; i++) {
     radius = Math.max(radius, Math.hypot(positions.getX(i), positions.getZ(i)))
   }
-  const scale = Math.min(1.35, FIT_RADIUS / Math.max(radius, 0.001))
+  const scale = Math.min(1.5, FIT_RADIUS / Math.max(radius, 0.001))
   geo.scale(scale, scale, scale)
   geo.computeBoundingBox()
   const height = geo.boundingBox.max.y
@@ -382,25 +447,59 @@ export function createOfficeBuilding({ seed = 1, accent = 0xc96442, kind = null 
   return mesh
 }
 
-/** Small yard props for plot clutter — planter, stool, bag, cooler, bin. */
-export function officeClutterGeometry(kind, rand) {
+/** Small yard props for plot clutter — shared plants plus department extras. */
+export function officeClutterGeometry(kind, rand, accent = 0xc4a574) {
   const c = new Furniture()
   if (kind === 'planter') {
-    potPlant(c, 0, 0, 0.85 + rand() * 0.25, rand() > 0.5)
+    potPlant(c, 0, 0, 0.95 + rand() * 0.3, rand() > 0.45)
   } else if (kind === 'stool') {
-    c.add(cyl(0.14, 0.14, 0.04, 8), OAK, { y: 0.42 })
-    c.add(cyl(0.03, 0.03, 0.4, 6), METAL, { y: 0.2 })
-    c.add(cyl(0.12, 0.12, 0.03, 8), METAL, { y: 0.02 })
-  } else if (kind === 'bag') {
-    c.add(roundBox(0.22, 0.28, 0.12, 0.03), DARK, { y: 0.16, ry: rand() * 6 })
-    c.add(box(0.16, 0.04, 0.04), METAL, { y: 0.32 })
+    c.add(cyl(0.16, 0.16, 0.05, 8), OAK, { y: 0.48 })
+    c.add(cyl(0.035, 0.035, 0.46, 6), METAL, { y: 0.23 })
+    c.add(cyl(0.14, 0.14, 0.04, 8), METAL, { y: 0.02 })
+  } else if (kind === 'box') {
+    c.add(roundBox(0.42, 0.32, 0.34, 0.02), 0xd2b48c, { y: 0.18, ry: rand() * 0.4 })
+    c.add(roundBox(0.36, 0.22, 0.3, 0.02), 0xc4a06a, { y: 0.44, x: 0.04 })
+  } else if (kind === 'bookshelf') {
+    c.add(roundBox(0.7, 1.15, 0.28, 0.02), WALNUT, { y: 0.58 })
+    for (let i = 0; i < 3; i++) c.add(box(0.62, 0.03, 0.24), OAK, { y: 0.28 + i * 0.32 })
+    c.add(box(0.12, 0.22, 0.18), accent, { x: -0.16, y: 0.42 })
+    c.add(box(0.1, 0.2, 0.16), DARK, { x: 0.08, y: 0.74 })
+  } else if (kind === 'case') {
+    c.add(roundBox(0.38, 0.22, 0.28, 0.03), 0x2c2418, { y: 0.14 })
+    c.add(box(0.3, 0.04, 0.22), 0xc9a24a, { y: 0.26 })
+  } else if (kind === 'pastry') {
+    c.add(cyl(0.16, 0.16, 0.04, 12), 0xf0d27a, { y: 0.08 })
+    c.add(cyl(0.1, 0.1, 0.05, 10), 0xc45a2a, { y: 0.12 })
+  } else if (kind === 'phone') {
+    c.add(roundBox(0.18, 0.28, 0.12, 0.02), DARK, { y: 0.2 })
+    c.add(box(0.08, 0.1, 0.04), accent, { y: 0.38, emissive: 0.3 })
+  } else if (kind === 'plaque') {
+    c.add(cyl(0.08, 0.1, 0.22, 6), METAL, { y: 0.12 })
+    c.add(box(0.16, 0.18, 0.04), 0xc9a24a, { y: 0.32 })
+  } else if (kind === 'clipboard') {
+    c.add(roundBox(0.22, 0.04, 0.3, 0.01), accent, { y: 0.08 })
+    c.add(box(0.16, 0.01, 0.22), WHITE, { y: 0.11 })
+  } else if (kind === 'crate') {
+    c.add(roundBox(0.4, 0.32, 0.36, 0.02), WALNUT, { y: 0.18 })
+  } else if (kind === 'headset') {
+    c.add(cyl(0.08, 0.08, 0.06, 8), DARK, { y: 0.1 })
+    const band = new THREE.TorusGeometry(0.1, 0.02, 6, 12, Math.PI)
+    c.add(band, accent, { y: 0.2 })
+  } else if (kind === 'cups') {
+    c.add(cyl(0.05, 0.06, 0.1, 8), WHITE, { x: -0.08, y: 0.08 })
+    c.add(cyl(0.05, 0.06, 0.1, 8), accent, { x: 0.08, y: 0.08 })
+  } else if (kind === 'cablebin') {
+    c.add(roundBox(0.28, 0.22, 0.28, 0.03), DARK, { y: 0.12 })
+    c.add(cyl(0.03, 0.03, 0.16, 6), METAL, { y: 0.28, x: 0.06 })
+  } else if (kind === 'gadget') {
+    c.add(roundBox(0.2, 0.12, 0.2, 0.02), FRAME, { y: 0.1 })
+    c.add(box(0.12, 0.02, 0.12), SCREEN, { y: 0.17, emissive: 0.6 })
   } else if (kind === 'cooler') {
-    c.add(roundBox(0.28, 0.72, 0.28, 0.03), WHITE, { y: 0.36 })
-    c.add(cyl(0.05, 0.05, 0.08, 8), METAL, { y: 0.76 })
-    c.add(box(0.18, 0.02, 0.12), FRAME, { y: 0.5, z: 0.14 })
+    c.add(roundBox(0.32, 0.82, 0.32, 0.03), WHITE, { y: 0.42 })
+    c.add(cyl(0.055, 0.055, 0.09, 8), METAL, { y: 0.86 })
   } else {
-    c.add(cyl(0.12, 0.14, 0.32, 8), DARK, { y: 0.16 })
-    c.add(cyl(0.13, 0.13, 0.03, 8), METAL, { y: 0.33 })
+    c.add(cyl(0.14, 0.16, 0.36, 8), DARK, { y: 0.18 })
+    c.add(cyl(0.15, 0.15, 0.04, 8), METAL, { y: 0.38 })
   }
   return c.finish()
 }

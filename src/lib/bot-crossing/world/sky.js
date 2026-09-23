@@ -464,7 +464,7 @@ export class Sky {
     this.nightBottom = new THREE.Color(planet.horizon).multiplyScalar(0.5)
     this.duskColor = new THREE.Color(planet.atmosphere > 0.4 ? 0xd4692f : 0x4a3550)
 
-    const indoor = Boolean(planet.indoor)
+    const indoor = Boolean(planet.indoor) && !planet.campus
     this.atrium.visible = indoor
     const comp = planet.companion
     this.companion.visible = Boolean(comp) && !indoor
@@ -563,9 +563,10 @@ export class Sky {
     this.domeUniforms.uDisc.value = 2.4 * THREE.MathUtils.smoothstep(this.sunDir.y, -0.06, 0.04)
 
     // Stars fade with the sky, and never appear at all on a thick-atmosphere daytime.
-    this.stars.material.uniforms.uOpacity.value = planet.indoor ? 0 : Math.pow(1 - day, 1.6) * (1 - planet.atmosphere * 0.35)
-    this.stars.visible = !planet.indoor && this.settings.get('stars') && this.stars.material.uniforms.uOpacity.value > 0.01
-    if (planet.indoor) this.domeUniforms.uDisc.value = 0.15
+    const enclosed = Boolean(planet.indoor) && !planet.campus
+    this.stars.material.uniforms.uOpacity.value = enclosed ? 0 : Math.pow(1 - day, 1.6) * (1 - planet.atmosphere * 0.35)
+    this.stars.visible = !enclosed && this.settings.get('stars') && this.stars.material.uniforms.uOpacity.value > 0.01
+    if (enclosed) this.domeUniforms.uDisc.value = 0.15
 
     this.companionHalo.material.uniforms.uStrength.value = 0.35 + (1 - day) * 0.65
     this.companionBody.material.emissiveIntensity = 0.25 + (1 - day) * 0.55

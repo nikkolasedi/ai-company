@@ -22,6 +22,8 @@ import {
   PLOT_CELL,
 } from '../world/plots.js'
 import { translateCells } from '../world/plot-move.js'
+import { departmentAccent } from '../world/departments.js'
+import { createCampus, disposeCampus } from '../world/campus.js'
 import { createBuilding, buildingUniforms, Scaffolds } from '../world/buildings.js'
 import { Ship } from '../world/ship.js'
 import { Astronauts } from '../agents/astronauts.js'
@@ -208,6 +210,11 @@ export class Colony {
       this.worldGroup.remove(this.scatterGroup)
       disposeTree(this.scatterGroup)
     }
+    if (this.campus) {
+      this.worldGroup.remove(this.campus)
+      disposeCampus(this.campus)
+      this.campus = null
+    }
 
     // An island world is shaped around the colony: the coast has to know the cells first.
     if (this.planet.shape === 'island') setIslandFootprint(this._footprintCells(), PLOT_CELL)
@@ -215,6 +222,7 @@ export class Colony {
     this.worldGroup.add(this.terrain)
     this._buildIsland()
     this._buildWater()
+    this._buildCampus()
     this._buildScatter()
 
     // The ship has legs, and legs have to reach the ground. Its landing spot is a fixed hex
@@ -367,6 +375,18 @@ export class Colony {
     this.water.ripple(x, z, strength)
   }
 
+  /** Street, lawn trees and neighbouring offices around the courtyard. */
+  _buildCampus() {
+    if (this.campus) {
+      this.worldGroup.remove(this.campus)
+      disposeCampus(this.campus)
+      this.campus = null
+    }
+    if (!this.planet.campus) return
+    this.campus = createCampus(shipPosition())
+    this.worldGroup.add(this.campus)
+  }
+
   /**
    * Ground scatter, placed to miss every tile of every plot and the ship's apron.
    *
@@ -388,7 +408,10 @@ export class Colony {
       }
     }
     const ship = shipPosition()
-    clear.push({ x: ship.x, z: ship.z, r: 7.5 })
+    clear.push({ x: ship.x, z: ship.z, r: this.planet.campus ? 12.5 : 7.5 })
+    for (const spot of this.campus?.userData.obstacles || []) {
+      clear.push({ x: spot.x, z: spot.z, r: spot.r + 1.2 })
+    }
     this.scatterGroup = createScatter(this.planet, this.settings.get('scatterDensity'), clear, 4242, (x, z) => this.onIsland(x, z))
     this.worldGroup.add(this.scatterGroup)
     this._scatterFootprint = this._plotFootprint()
@@ -555,7 +578,7 @@ export class Colony {
       const taken = new Set(slotOf.values())
       for (const thread of list) {
         if (slotOf.has(thread.id)) continue
-        let slot = 0
+        let slot = this.planet.indoor ? 1 : 0
         while (taken.has(slot)) slot++
         taken.add(slot)
         slotOf.set(thread.id, slot)
@@ -662,7 +685,15 @@ export class Colony {
       const cells = layout.get(name)
       if (!cells?.length) return
       const accent = this._pickAccent(name)
-      const plot = new Plot({ id: name, name, index, cells, accent, style: this.planet.indoor ? 'office' : 'colony' })
+      const plot = new Plot({
+        id: name,
+        name,
+        index,
+        cells,
+        accent,
+        style: this.planet.indoor ? 'office' : 'colony',
+        department: name,
+      })
       plot.signature = wanted.get(name)
       this.plots.set(name, plot)
       this.plotGroup.add(plot.group)
@@ -725,6 +756,11 @@ export class Colony {
 
   /** A stable colour per repo, probing forward on a collision so no two plots match. */
   _pickAccent(name) {
+    const branded = departmentAccent(name)
+    if (branded) {
+      this.usedAccents.add(branded)
+      return branded
+    }
     const start = hashString(name) % PLOT_PALETTE.length
     for (let i = 0; i < PLOT_PALETTE.length; i++) {
       const accent = PLOT_PALETTE[(start + i) % PLOT_PALETTE.length]
@@ -742,7 +778,12 @@ export class Colony {
     const target = 1
 
     if (!entry) {
-      const mesh = createBuilding({ seed: hashString(thread.id), accent: plot.accent, indoor: this.planet.indoor })
+      const mesh = createBuilding({
+        seed: hashString(thread.id),
+        accent: plot.accent,
+        indoor: this.planet.indoor,
+        kind: this.planet.indoor ? 'habitat' : null,
+      })
       const pos = plot.worldSlot(index)
       mesh.position.copy(pos)
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
@@ -846,8 +887,25 @@ export class Colony {
       }
     }
 
+    for (const plot of this.plotOrder) {
+      if (!plot.landmark) continue
+      const p = plot.landmark.position
+      const footprint = plot.landmark.userData.footprint || 1.4
+      obstacles.push({
+        x: plot.center.x + p.x,
+        z: plot.center.z + p.z,
+        r: footprint * 0.8 + TRAVEL_RADIUS,
+        keep: footprint * 0.92 + AGENT_RADIUS,
+      })
+    }
+
+    for (const spot of this.campus?.userData.obstacles || []) {
+      if (spot.r < 0.55) continue
+      obstacles.push({ x: spot.x, z: spot.z, r: spot.r + TRAVEL_RADIUS, keep: spot.r + AGENT_RADIUS + 0.1 })
+    }
+
     const ship = shipPosition()
-    obstacles.push({ x: ship.x, z: ship.z, r: 3.4 + AGENT_RADIUS })
+    obstacles.push({ x: ship.x, z: ship.z, r: (this.ship.footRadius || 3.4) + AGENT_RADIUS })
     this.nav.rebuild(obstacles)
   }
 
@@ -1301,6 +1359,10 @@ export class Colony {
     this.island?.dispose()
     this.rock?.dispose()
     this.water?.dispose()
+    if (this.campus) {
+      disposeCampus(this.campus)
+      this.campus = null
+    }
     this.ship.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
