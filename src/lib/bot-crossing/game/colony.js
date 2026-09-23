@@ -23,7 +23,8 @@ import {
 } from '../world/plots.js'
 import { translateCells } from '../world/plot-move.js'
 import { departmentAccent } from '../world/departments.js'
-import { createCampus, disposeCampus } from '../world/campus.js'
+import { createCampus, disposeCampus, campusObstacles } from '../world/campus.js'
+import { tagEditable, hasOverride } from '../editor/layout.js'
 import { createBuilding, buildingUniforms, Scaffolds } from '../world/buildings.js'
 import { Ship } from '../world/ship.js'
 import { Astronauts } from '../agents/astronauts.js'
@@ -229,7 +230,9 @@ export class Colony {
     // cell, but the height of that spot is the planet's, so it is set here rather than once
     // at construction — a world with more relief would otherwise leave it hovering.
     const ship = shipPosition()
-    this.ship.group.position.y = terrainHeight(ship.x, ship.z, this.planet)
+    if (!hasOverride('shuttle')) {
+      this.ship.group.position.y = terrainHeight(ship.x, ship.z, this.planet)
+    }
 
     this._dustTint.set(this.planet.ground.high)
 
@@ -385,6 +388,7 @@ export class Colony {
     if (!this.planet.campus) return
     this.campus = createCampus(shipPosition())
     this.worldGroup.add(this.campus)
+    this.editor?.refresh()
   }
 
   /**
@@ -409,6 +413,7 @@ export class Colony {
     }
     const ship = shipPosition()
     clear.push({ x: ship.x, z: ship.z, r: this.planet.campus ? 12.5 : 7.5 })
+    if (this.campus) this.campus.userData.obstacles = campusObstacles(this.campus)
     for (const spot of this.campus?.userData.obstacles || []) {
       clear.push({ x: spot.x, z: spot.z, r: spot.r + 1.2 })
     }
@@ -705,6 +710,7 @@ export class Colony {
     })
 
     this.plotOrder = [...this.plots.values()]
+    this.editor?.refresh()
     // Zones that just moved, appeared or grew are zones the scatter does not know about —
     // nor, on a floating island, the rock under them; and on an island in the sea, the
     // coast itself moves, which is the whole terrain.
@@ -789,6 +795,7 @@ export class Colony {
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
       // New buildings rise from nothing rather than appearing whole.
       mesh.userData.setProgress(0)
+      tagEditable(mesh, `desk:${thread.id}`, mesh.userData.label || 'Desk', mesh.userData.footprint || 1.2)
       this.worldGroup.add(mesh)
       entry = { mesh, plot: plot.id, slot: index, progress: 0, target, retiring: false }
       this.buildings.set(thread.id, entry)
@@ -801,7 +808,7 @@ export class Colony {
       if (entry.plot !== plot.id || entry.slot !== index || entry.mesh.position.distanceToSquared(want) > 1e-4) {
         entry.plot = plot.id
         entry.slot = index
-        entry.mesh.position.copy(want)
+        if (!hasOverride(`desk:${thread.id}`)) entry.mesh.position.copy(want)
       }
     }
 
@@ -904,8 +911,10 @@ export class Colony {
       obstacles.push({ x: spot.x, z: spot.z, r: spot.r + TRAVEL_RADIUS, keep: spot.r + AGENT_RADIUS + 0.1 })
     }
 
-    const ship = shipPosition()
-    obstacles.push({ x: ship.x, z: ship.z, r: (this.ship.footRadius || 3.4) + AGENT_RADIUS })
+    if (this.campus) this.campus.userData.obstacles = campusObstacles(this.campus)
+    const ship = this.ship.group.position
+    const shipScale = Math.max(this.ship.group.scale.x, this.ship.group.scale.z)
+    obstacles.push({ x: ship.x, z: ship.z, r: (this.ship.footRadius || 3.4) * shipScale + AGENT_RADIUS })
     this.nav.rebuild(obstacles)
   }
 

@@ -7,6 +7,8 @@ import { loadKit } from "./world/kit.js";
 import { loadCrew, crewRig } from "./agents/crew.js";
 import { loadHumans, humanRigs } from "./agents/humans.js";
 import { PLANETS } from "./world/planet.js";
+import { SceneEditor } from "./editor/scene-editor.js";
+import { campusObstacles } from "./world/campus.js";
 import type { BotCrossingThread } from "./adapters/agent-to-thread";
 
 /** Survives leaving the office and coming back, so the ship walk-out plays once per session. */
@@ -19,6 +21,7 @@ export interface ColonyRuntime {
   settings: Settings;
   applyThreads: (threads: BotCrossingThread[]) => void;
   pickAgent: (ndcX: number, ndcY: number, aspect: number) => string | null;
+  editor: SceneEditor;
   dispose: () => void;
 }
 
@@ -70,6 +73,21 @@ export async function bootColony(container: HTMLElement): Promise<ColonyRuntime>
     colony.setThreads(list, new Set(), new Set(), known);
   };
 
+  const editor = new SceneEditor({
+    camera: engine.camera,
+    renderer: engine.renderer,
+    scene: engine.scene,
+    roots: [engine.scene, colony.plotGroup],
+    rig,
+  });
+  colony.editor = editor;
+  let navTimer: ReturnType<typeof setTimeout> | undefined;
+  editor.onChange(() => {
+    if (colony.campus) colony.campus.userData.obstacles = campusObstacles(colony.campus);
+    clearTimeout(navTimer);
+    navTimer = setTimeout(() => colony._rebuildNavigation(), 180);
+  });
+
   engine.add({
     update(dt: number, elapsed: number) {
       rig.update(dt);
@@ -86,12 +104,15 @@ export async function bootColony(container: HTMLElement): Promise<ColonyRuntime>
     colony,
     rig,
     settings,
+    editor,
     applyThreads,
     pickAgent(ndcX, ndcY, aspect) {
+      if (editor.enabled) return null;
       const hit = colony.pick(ndcX, ndcY, aspect);
       return hit?.id ?? null;
     },
     dispose() {
+      editor.dispose();
       engine.stop();
       engine.dispose();
       colony.dispose();

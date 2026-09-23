@@ -64,6 +64,8 @@ export class CameraRig {
     this.idleFor = 0
     this.interacting = false
     this.enabled = true
+    /** When the layout editor is on, left-drag is for gizmos — only orbit/zoom stay on the camera. */
+    this.editLocked = false
     /** Google Earth's auto-rotate: a slow continuous sweep around whatever is centred. */
     this.orbiting = false
     /** 0..1 share of ORBIT_RATE currently being applied — see `update`. */
@@ -139,6 +141,10 @@ export class CameraRig {
 
     // Right, middle, ctrl or shift all mean "tilt and rotate", as in Earth.
     const orbit = e.button === 2 || e.button === 1 || e.ctrlKey || e.shiftKey || e.altKey
+    if (this.editLocked && !orbit) {
+      this._mode = null
+      return
+    }
     this._mode = orbit ? 'orbit' : 'pan'
     this._last.set(e.clientX, e.clientY)
     this.interacting = true

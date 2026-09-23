@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { withCurve } from '../core/curve.js'
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
+import { tagEditable } from '../editor/layout.js'
 
 /**
  * The company shuttle stop. People walk out of the shelter when a thread appears
@@ -49,6 +50,7 @@ export class Ship {
     this._buildBus()
     this._buildShelter()
     this._buildLights()
+    tagEditable(this.group, 'shuttle', 'Shuttle stop', this.footRadius)
 
     this.traffic = 0
   }

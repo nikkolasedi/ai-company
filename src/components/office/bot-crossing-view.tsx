@@ -9,6 +9,7 @@ import {
   type BotCrossingThread,
 } from "@/lib/bot-crossing/adapters/agent-to-thread";
 import type { ColonyRuntime } from "@/lib/bot-crossing/runtime";
+import { SceneEditorToolbar } from "./scene-editor-toolbar";
 
 function eventKey(event: OfficeEvent) {
   return `${event.timestamp}|${event.type}|${event.agentId ?? ""}|${event.taskId ?? ""}|${event.message ?? ""}`;
@@ -144,6 +145,8 @@ export function BotCrossingView({
     <div
       ref={containerRef}
       className="bot-crossing-root absolute inset-0 overflow-hidden rounded-lg bg-[#d8dce6]"
-    />
+    >
+      {ready && <SceneEditorToolbar runtime={runtimeRef.current} />}
+    </div>
   );
 }

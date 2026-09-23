@@ -5,6 +5,7 @@ import { atlasTexture, hasPart, part } from './kit.js'
 import { mulberry } from './planet.js'
 import { officeClutterGeometry, OFFICE_CLUTTER, createOfficeBuilding } from './office-furniture.js'
 import { departmentClutter, departmentLandmark } from './departments.js'
+import { tagEditable } from '../editor/layout.js'
 import { withCurve } from '../core/curve.js'
 import { OVERLAY_LAYER } from '../core/engine.js'
 import { BUILDING_RADIUS } from './buildings.js'
@@ -650,6 +651,7 @@ export class Plot {
     const { x, z } = this.localCenters[0]
     mesh.position.set(x, DECK_TOP, z)
     mesh.userData.setProgress(1)
+    tagEditable(mesh, `landmark:${this.id}`, `${this.name} landmark`, mesh.userData.footprint || 1.4)
     this.group.add(mesh)
     this.landmark = mesh
   }
