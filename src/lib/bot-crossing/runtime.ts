@@ -29,6 +29,14 @@ export async function bootColony(container: HTMLElement): Promise<ColonyRuntime>
   if (!hasStoredSettings()) {
     settings.applyPreset("medium");
   }
+  settings.set("planet", "office");
+  settings.set("timeOfDay", 0.38);
+  settings.set("autoTime", false);
+  settings.set("clockTime", false);
+  settings.set("stars", false);
+  settings.set("exposure", 0.88);
+  settings.set("iblIntensity", 0.55);
+  settings.set("bloomStrength", 0.12);
 
   const engine = new Engine(settings).mount(container);
   const planetKey = settings.get("planet") as keyof typeof PLANETS;

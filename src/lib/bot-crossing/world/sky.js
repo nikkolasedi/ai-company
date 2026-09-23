@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { COLONY_RADIUS, mulberry } from './planet.js'
 
 /**
@@ -162,6 +163,7 @@ export class Sky {
     this._buildLights()
     this._buildStars()
     this._buildCompanion()
+    this._buildAtrium()
 
     this._buildEnvironment()
     scene.fog = new THREE.Fog(0x000000, 90, 260)
@@ -389,6 +391,67 @@ export class Sky {
     this.group.add(this.companion)
   }
 
+  /** Indoor atrium: glass ring, soft ceiling, distant city blocks. */
+  _buildAtrium() {
+    this.atrium = new THREE.Group()
+    this.atrium.name = 'atrium'
+    this.atrium.visible = false
+
+    const wall = new THREE.Mesh(
+      new THREE.CylinderGeometry(78, 78, 22, 24, 1, true),
+      new THREE.MeshStandardMaterial({
+        color: 0x9eb4c8,
+        transparent: true,
+        opacity: 0.22,
+        roughness: 0.12,
+        metalness: 0.08,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      })
+    )
+    wall.position.y = 11
+    wall.receiveShadow = true
+    this.atrium.add(wall)
+
+    const mullions = []
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2
+      const post = new THREE.BoxGeometry(0.18, 22, 0.18)
+      post.translate(Math.cos(a) * 78, 11, Math.sin(a) * 78)
+      mullions.push(post)
+    }
+    const frame = new THREE.Mesh(
+      BufferGeometryUtils.mergeGeometries(mullions),
+      new THREE.MeshStandardMaterial({ color: 0xe8ece8, roughness: 0.4, metalness: 0.15 })
+    )
+    mullions.forEach((g) => g.dispose())
+    this.atrium.add(frame)
+
+    const city = []
+    const rand = mulberry(404)
+    for (let i = 0; i < 28; i++) {
+      const a = rand() * Math.PI * 2
+      const d = 95 + rand() * 40
+      const h = 6 + rand() * 18
+      const w = 3 + rand() * 5
+      const geo = new THREE.BoxGeometry(w, h, w)
+      geo.translate(Math.cos(a) * d, h * 0.45, Math.sin(a) * d)
+      city.push(geo)
+    }
+    const cityGeo = BufferGeometryUtils.mergeGeometries(city)
+    city.forEach((g) => g.dispose())
+    const cityCol = new Float32Array(cityGeo.attributes.position.count * 3)
+    // Approximate: one color per building is enough if we just tint the whole mesh.
+    this.atrium.add(
+      new THREE.Mesh(
+        cityGeo,
+        new THREE.MeshStandardMaterial({ color: 0x6a7380, roughness: 0.9, metalness: 0.05 })
+      )
+    )
+
+    this.group.add(this.atrium)
+  }
+
   // ── planet + time ───────────────────────────────────────────────────────────────────
 
   setPlanet(planet) {
@@ -401,16 +464,20 @@ export class Sky {
     this.nightBottom = new THREE.Color(planet.horizon).multiplyScalar(0.5)
     this.duskColor = new THREE.Color(planet.atmosphere > 0.4 ? 0xd4692f : 0x4a3550)
 
+    const indoor = Boolean(planet.indoor)
+    this.atrium.visible = indoor
     const comp = planet.companion
-    this.companionBody.material.color.set(comp.color)
-    this.companionBody.material.emissive.set(comp.color)
-    this.companionBody.material.emissiveIntensity = 0.35
-    this.companionHalo.material.uniforms.uColor.value.set(comp.glow)
-    this.companion.scale.setScalar(comp.size)
-    // Parked high and off to one side, well away from where the sun tracks.
-    const dir = new THREE.Vector3(-0.55, 0.5, -0.66).normalize()
-    this.companion.position.copy(dir.multiplyScalar(300))
-    this.companionHalo.scale.setScalar(2.2)
+    this.companion.visible = Boolean(comp) && !indoor
+    if (comp) {
+      this.companionBody.material.color.set(comp.color)
+      this.companionBody.material.emissive.set(comp.color)
+      this.companionBody.material.emissiveIntensity = 0.35
+      this.companionHalo.material.uniforms.uColor.value.set(comp.glow)
+      this.companion.scale.setScalar(comp.size)
+      const dir = new THREE.Vector3(-0.55, 0.5, -0.66).normalize()
+      this.companion.position.copy(dir.multiplyScalar(300))
+      this.companionHalo.scale.setScalar(2.2)
+    }
 
     this._envDirty = true
     this.domeUniforms.uHaze.value = 0.25 + planet.atmosphere * 0.5
@@ -496,8 +563,9 @@ export class Sky {
     this.domeUniforms.uDisc.value = 2.4 * THREE.MathUtils.smoothstep(this.sunDir.y, -0.06, 0.04)
 
     // Stars fade with the sky, and never appear at all on a thick-atmosphere daytime.
-    this.stars.material.uniforms.uOpacity.value = Math.pow(1 - day, 1.6) * (1 - planet.atmosphere * 0.35)
-    this.stars.visible = this.settings.get('stars') && this.stars.material.uniforms.uOpacity.value > 0.01
+    this.stars.material.uniforms.uOpacity.value = planet.indoor ? 0 : Math.pow(1 - day, 1.6) * (1 - planet.atmosphere * 0.35)
+    this.stars.visible = !planet.indoor && this.settings.get('stars') && this.stars.material.uniforms.uOpacity.value > 0.01
+    if (planet.indoor) this.domeUniforms.uDisc.value = 0.15
 
     this.companionHalo.material.uniforms.uStrength.value = 0.35 + (1 - day) * 0.65
     this.companionBody.material.emissiveIntensity = 0.25 + (1 - day) * 0.55
@@ -578,6 +646,12 @@ export class Sky {
     this.companionBody.material.dispose()
     this.companionHalo.geometry.dispose()
     this.companionHalo.material.dispose()
+    this.atrium?.traverse((o) => {
+      if (o.isMesh) {
+        o.geometry.dispose()
+        o.material.dispose()
+      }
+    })
     this.scene.remove(this.group)
   }
 }

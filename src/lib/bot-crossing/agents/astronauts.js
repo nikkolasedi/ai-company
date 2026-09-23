@@ -354,7 +354,38 @@ export class Astronauts {
       mesh.visible = false
       mesh.count = 0
     }
+    this._buildLanyards(this.capacity)
     this._applyShadowFlags()
+  }
+
+  _buildLanyards(capacity) {
+    this._disposeLanyards()
+    const strap = new THREE.BoxGeometry(0.07, 0.22, 0.012)
+    strap.translate(0, -0.12, 0.08)
+    const badge = new THREE.BoxGeometry(0.09, 0.12, 0.018)
+    badge.translate(0, -0.26, 0.09)
+    const strapMat = new THREE.MeshStandardMaterial({ color: 0x3a5a8c, roughness: 0.55, metalness: 0.05 })
+    const badgeMat = new THREE.MeshStandardMaterial({ color: 0xf4f0e6, roughness: 0.4, metalness: 0.08 })
+    this.lanyardStrap = new THREE.InstancedMesh(strap, strapMat, capacity)
+    this.lanyardBadge = new THREE.InstancedMesh(badge, badgeMat, capacity)
+    for (const mesh of [this.lanyardStrap, this.lanyardBadge]) {
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+      mesh.count = 0
+      mesh.frustumCulled = false
+      mesh.castShadow = false
+      this.group.add(mesh)
+    }
+  }
+
+  _disposeLanyards() {
+    for (const mesh of [this.lanyardStrap, this.lanyardBadge]) {
+      if (!mesh) continue
+      this.group.remove(mesh)
+      mesh.geometry.dispose()
+      mesh.material.dispose()
+    }
+    this.lanyardStrap = null
+    this.lanyardBadge = null
   }
 
   _humanMesh(part, frameAttr, uniforms) {
@@ -395,6 +426,7 @@ export class Astronauts {
       mesh.customDepthMaterial?.dispose()
     }
     this.humanMeshes = null
+    this._disposeLanyards()
     if (!this.humanData) return
     for (const rig of Object.values(this.humanData)) {
       rig.meshes = null
@@ -1710,6 +1742,13 @@ export class Astronauts {
       worn.multiplyMatrices(root, bone)
       agent.headWorld.setFromMatrixPosition(worn)
 
+      if (this.lanyardStrap && this.lanyardBadge) {
+        attachMatrixAt(rig, agent.frame, 1, bone)
+        worn.multiplyMatrices(root, bone)
+        this.lanyardStrap.setMatrixAt(drawn, worn)
+        this.lanyardBadge.setMatrixAt(drawn, worn)
+      }
+
       agent.index = slot
       this._drawnAgents[drawn] = agent
       drawn++
@@ -1725,6 +1764,14 @@ export class Astronauts {
       for (const attr of rig.frameAttrs) attr.needsUpdate = true
     }
     for (const mesh of Object.values(this.parts)) mesh.count = 0
+    if (this.lanyardStrap) {
+      this.lanyardStrap.count = drawn
+      this.lanyardStrap.instanceMatrix.needsUpdate = true
+    }
+    if (this.lanyardBadge) {
+      this.lanyardBadge.count = drawn
+      this.lanyardBadge.instanceMatrix.needsUpdate = true
+    }
     this.props?.begin()
     this.props?.end()
     this.visibleCount = drawn

@@ -1,8 +1,9 @@
 import * as THREE from 'three'
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
-import { DECK_TEXTURE_SCALE, KERB_UV, deckSurface, kerbSurface } from './surfaces.js'
+import { DECK_TEXTURE_SCALE, KERB_UV, deckSurface, kerbSurface, rugSurface, railSurface } from './surfaces.js'
 import { atlasTexture, hasPart, part } from './kit.js'
 import { mulberry } from './planet.js'
+import { officeClutterGeometry, OFFICE_CLUTTER } from './office-furniture.js'
 import { withCurve } from '../core/curve.js'
 import { OVERLAY_LAYER } from '../core/engine.js'
 import { BUILDING_RADIUS } from './buildings.js'
@@ -360,12 +361,13 @@ function hexPrism(radius, height) {
 // ── plot mesh ─────────────────────────────────────────────────────────────────────────
 
 export class Plot {
-  constructor({ id, name, index, cells, accent }) {
+  constructor({ id, name, index, cells, accent, style = 'office' }) {
     this.id = id
     this.name = name
     this.index = index
     this.cells = cells
     this.accent = accent
+    this.style = style
     this.cellKeys = new Set(cells.map((c) => key(c.q, c.r)))
 
     // The plot's origin is its **root** tile — the one it was seeded on and never gives up
@@ -436,8 +438,11 @@ export class Plot {
     // rather than compete with them — but its rim faces sideways, so whatever the top reads
     // as in full sun the edge reads as one stop darker, and a backdrop that goes to nothing
     // at the plot boundary just looks like a hole.
-    const color = new THREE.Color(this.accent).offsetHSL(0, -0.38, 0).multiplyScalar(0.9)
-    const plate = deckSurface()
+    const office = this.style === 'office'
+    const color = office
+      ? new THREE.Color(this.accent).offsetHSL(0, -0.12, 0.06).multiplyScalar(0.92)
+      : new THREE.Color(this.accent).offsetHSL(0, -0.38, 0).multiplyScalar(0.9)
+    const plate = office ? rugSurface() : deckSurface()
     this.deck = new THREE.Mesh(
       geo,
       new THREE.MeshStandardMaterial({
@@ -445,9 +450,9 @@ export class Plot {
         map: plate.map,
         normalMap: plate.normalMap,
         roughnessMap: plate.roughnessMap,
-        normalScale: new THREE.Vector2(0.7, 0.7),
-        roughness: 0.82,
-        metalness: 0.18,
+        normalScale: new THREE.Vector2(office ? 0.35 : 0.7, office ? 0.35 : 0.7),
+        roughness: office ? 0.88 : 0.82,
+        metalness: office ? 0.02 : 0.18,
       })
     )
     this.deck.receiveShadow = true
@@ -467,7 +472,8 @@ export class Plot {
   _buildBorder() {
     const parts = []
     const apothem = TILE * Math.cos(Math.PI / 6)
-    const width = 0.32
+    const office = this.style === 'office'
+    const width = office ? 0.28 : 0.32
     const inset = 0.05
     // Centreline of the bar, pulled inboard far enough to clear the tile edge entirely.
     const mid = apothem - inset - width / 2
@@ -482,10 +488,10 @@ export class Plot {
 
         const angle = (Math.PI / 3) * edge + Math.PI / 6
         // Sits on the deck: bottom flush with the deck's top face, never inside it.
-        const geo = new THREE.BoxGeometry(width, 0.14, side * 1.02)
+        const geo = new THREE.BoxGeometry(width, office ? 0.2 : 0.14, side * 1.02)
         kerbUv(geo)
         geo.rotateY(-angle)
-        geo.translate(x + Math.cos(angle) * mid, DECK_TOP + 0.07, z + Math.sin(angle) * mid)
+        geo.translate(x + Math.cos(angle) * mid, DECK_TOP + (office ? 0.1 : 0.07), z + Math.sin(angle) * mid)
         parts.push(geo)
       }
     })
@@ -495,45 +501,71 @@ export class Plot {
     parts.forEach((g) => g.dispose())
     // Every bar is the same length, so a box's own 0..1 UVs put the same run of dashes on
     // each one without any reprojection.
-    const lit = kerbSurface()
+    const lit = office ? railSurface() : kerbSurface()
     this.borderMaterial = new THREE.MeshStandardMaterial({
-      color: this.accent,
+      color: office ? 0xb08958 : this.accent,
       map: lit.map,
-      emissive: this.accent,
-      emissiveMap: lit.emissiveMap,
-      emissiveIntensity: 0.5,
+      emissive: office ? 0x000000 : this.accent,
+      emissiveMap: office ? null : lit.emissiveMap,
+      emissiveIntensity: office ? 0 : 0.5,
       normalMap: lit.normalMap,
       normalScale: new THREE.Vector2(0.5, 0.5),
-      roughness: 0.55,
-      metalness: 0.1,
+      roughness: office ? 0.7 : 0.55,
+      metalness: office ? 0.04 : 0.1,
     })
     this.border = new THREE.Mesh(geo, this.borderMaterial)
     this.border.receiveShadow = true
     this.group.add(this.border)
   }
 
-  /** A lamp post on one corner of each cell — the plot's own night lighting. */
+  /** Floor lamps (office) or runway posts (colony). */
   _buildPosts() {
     const posts = []
     const lamps = []
+    const office = this.style === 'office'
     this.localCenters.forEach(({ x, z }, i) => {
-      const [px, pz] = corner(x, z, (i * 2) % 6, TILE * 0.72)
-      const pole = new THREE.CylinderGeometry(0.055, 0.085, 1.8, 6)
-      pole.translate(px, DECK_TOP + 0.9, pz)
-      posts.push(pole)
-      const head = new THREE.SphereGeometry(0.14, 8, 6)
-      head.translate(px, DECK_TOP + 1.84, pz)
-      lamps.push(head)
+      const [px, pz] = corner(x, z, (i * 2) % 6, TILE * (office ? 0.68 : 0.72))
+      if (office) {
+        const pole = new THREE.CylinderGeometry(0.03, 0.04, 1.15, 6)
+        pole.translate(px, DECK_TOP + 0.58, pz)
+        posts.push(pole)
+        const shade = new THREE.CylinderGeometry(0.18, 0.12, 0.2, 10)
+        shade.translate(px, DECK_TOP + 1.22, pz)
+        lamps.push(shade)
+        if (i % 2 === 0) {
+          const arm = new THREE.CylinderGeometry(0.018, 0.018, 0.7, 5)
+          arm.rotateZ(Math.PI / 2)
+          arm.translate(px + 0.28, DECK_TOP + 1.55, pz)
+          posts.push(arm)
+          const pendant = new THREE.SphereGeometry(0.1, 8, 6)
+          pendant.translate(px + 0.62, DECK_TOP + 1.42, pz)
+          lamps.push(pendant)
+        }
+      } else {
+        const pole = new THREE.CylinderGeometry(0.055, 0.085, 1.8, 6)
+        pole.translate(px, DECK_TOP + 0.9, pz)
+        posts.push(pole)
+        const head = new THREE.SphereGeometry(0.14, 8, 6)
+        head.translate(px, DECK_TOP + 1.84, pz)
+        lamps.push(head)
+      }
     })
 
     const poleMesh = new THREE.Mesh(
       BufferGeometryUtils.mergeGeometries(posts),
-      new THREE.MeshStandardMaterial({ color: 0x9a9aa2, roughness: 0.7, metalness: 0.3 })
+      new THREE.MeshStandardMaterial({
+        color: office ? 0xb8b0a4 : 0x9a9aa2,
+        roughness: 0.55,
+        metalness: office ? 0.2 : 0.3,
+      })
     )
     poleMesh.castShadow = true
-    this.lampMaterial = new THREE.MeshBasicMaterial({ color: this.accent, toneMapped: true })
+    this.lampMaterial = new THREE.MeshBasicMaterial({
+      color: office ? 0xffe2b0 : this.accent,
+      toneMapped: true,
+    })
     this.lamps = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(lamps), this.lampMaterial)
-    this._lampBase = new THREE.Color(this.accent)
+    this._lampBase = new THREE.Color(office ? 0xffe2b0 : this.accent)
     this.group.add(poleMesh, this.lamps)
     posts.forEach((g) => g.dispose())
     lamps.forEach((g) => g.dispose())
@@ -550,8 +582,11 @@ export class Plot {
    * Seeded off the plot's own name, so a repo's yard is laid out the same on every reload.
    */
   _buildClutter() {
-    const props = ['containers_A', 'containers_B', 'containers_C', 'containers_D', 'cargo_A', 'cargo_B', 'cargo_A_packed', 'cargo_B_packed', 'lights']
-    if (!props.every((n) => hasPart(n))) return
+    const office = this.style === 'office'
+    const props = office
+      ? OFFICE_CLUTTER
+      : ['containers_A', 'containers_B', 'containers_C', 'containers_D', 'cargo_A', 'cargo_B', 'cargo_A_packed', 'cargo_B_packed', 'lights']
+    if (!office && !props.every((n) => hasPart(n))) return
 
     const rand = mulberry(hashString(this.id) + 17)
     const parts = []
@@ -559,33 +594,25 @@ export class Plot {
     this.clutterSpots = []
 
     this.localCenters.forEach(({ x, z }) => {
-      // Two bands, both chosen to miss the buildings. The slot ring sits at 0.58 of a tile
-      // and a building reaches about 1.5 units past it, so the gaps *between* consecutive
-      // ring slots are clear — and so is the strip inside the kerb, past every slot.
       const spots = []
       for (let i = 0; i < 6; i++) {
-        if (rand() > 0.45) spots.push({ a: (Math.PI / 3) * i + Math.PI / 3, r: TILE * (0.52 + rand() * 0.1) })
+        if (rand() > (office ? 0.55 : 0.45)) spots.push({ a: (Math.PI / 3) * i + Math.PI / 3, r: TILE * (0.52 + rand() * 0.1) })
       }
       for (let i = 0; i < 3; i++) {
-        if (rand() > 0.35) spots.push({ a: rand() * Math.PI * 2, r: TILE * (0.78 + rand() * 0.07) })
+        if (rand() > (office ? 0.5 : 0.35)) spots.push({ a: rand() * Math.PI * 2, r: TILE * (0.78 + rand() * 0.07) })
       }
 
       for (const { a, r } of spots) {
         const name = props[Math.floor(rand() * props.length)]
-        const geo = part(name)
-        const s = name === 'lights' ? 1.1 : 1.35
-        geo.scale(s, s, s)
+        const geo = office ? officeClutterGeometry(name, rand) : part(name)
+        const s = office ? 1 : name === 'lights' ? 1.1 : 1.35
+        if (s !== 1) geo.scale(s, s, s)
         geo.rotateY(rand() * Math.PI * 2)
         const px = x + Math.cos(a) * r
         const pz = z + Math.sin(a) * r
-        // How much ground this prop actually covers, rather than a guess: a stack of cargo
-        // containers is three times the footprint of a lamp, and a radius that splits the
-        // difference is one an astronaut walks into the corner of.
         geo.computeBoundingBox()
         const box = geo.boundingBox
         const spread = Math.hypot(Math.max(Math.abs(box.min.x), Math.abs(box.max.x)), Math.max(Math.abs(box.min.z), Math.abs(box.max.z)))
-        // Reserve a full footprint and a walking gap, not just a centre point. Skip a
-        // cramped prop instead of pushing it onto a building or over the kerb.
         if (!this.containsLocal(px, pz, spread + 0.16) ||
             this.slots.some((s) => Math.hypot(px - s.x, pz - s.z) < BUILDING_RADIUS + spread + 0.4) ||
             this.clutterSpots.some((s) => Math.hypot(px - s.x, pz - s.z) < s.r + spread + 0.25)) {
@@ -603,7 +630,9 @@ export class Plot {
     parts.forEach((g) => g.dispose())
     this.clutter = new THREE.Mesh(
       geo,
-      new THREE.MeshStandardMaterial({ map: atlasTexture(), roughness: 0.6, metalness: 0.05 })
+      office
+        ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.62, metalness: 0.06 })
+        : new THREE.MeshStandardMaterial({ map: atlasTexture(), roughness: 0.6, metalness: 0.05 })
     )
     this.clutter.castShadow = true
     this.clutter.receiveShadow = true
@@ -654,11 +683,12 @@ export class Plot {
 
   /** Night lighting, plus a pulse on the border when this plot holds something urgent. */
   setNight(night, urgent, elapsed) {
-    if (this.borderMaterial) {
+    if (this.borderMaterial && this.style !== 'office') {
       this.borderMaterial.emissiveIntensity =
         0.3 + night * 1.4 + (urgent ? 0.4 + Math.sin(elapsed * 3.4) * 0.32 : 0)
     }
-    this.lampMaterial.color.copy(this._lampBase).multiplyScalar(0.5 + night * 2.4)
+    const lampGain = this.style === 'office' ? 1.15 : 0.5 + night * 2.4
+    this.lampMaterial.color.copy(this._lampBase).multiplyScalar(lampGain)
   }
 
   dispose() {

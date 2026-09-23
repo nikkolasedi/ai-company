@@ -23,6 +23,8 @@ export const DECK_TEXTURE_SCALE = 4
 
 let deck = null
 let kerb = null
+let rug = null
+let rail = null
 
 /**
  * The plot deck: a plated metal floor of bolted panels.
@@ -126,6 +128,68 @@ export function deckSurface(size = 512) {
  * lighting, which is what a landing apron should have. The emissive mask is separate from
  * the albedo so the dark gaps stay dark after nightfall instead of glowing grey.
  */
+/**
+ * Soft carpet / wood hex rug: woven nap, no bolt heads.
+ */
+export function rugSurface(size = 512) {
+  if (rug) return rug
+  const albedo = canvas(size)
+  const height = canvas(size)
+  const a = albedo.ctx
+  const h = height.ctx
+  a.fillStyle = '#c8b79a'
+  a.fillRect(0, 0, size, size)
+  h.fillStyle = '#808080'
+  h.fillRect(0, 0, size, size)
+  const rand = mulberry(0x71e)
+  for (let y = 0; y < size; y += 4) {
+    for (let x = 0; x < size; x += 4) {
+      const shade = 188 + Math.round((rand() - 0.5) * 22)
+      a.fillStyle = `rgb(${shade},${shade - 12},${shade - 28})`
+      a.fillRect(x, y, 4, 4)
+    }
+  }
+  a.strokeStyle = 'rgba(90,70,45,0.12)'
+  a.lineWidth = 2
+  h.strokeStyle = '#707070'
+  h.lineWidth = 2
+  for (let i = 0; i <= 8; i++) {
+    a.beginPath()
+    a.moveTo((i * size) / 8, 0)
+    a.lineTo((i * size) / 8, size)
+    a.stroke()
+    h.beginPath()
+    h.moveTo((i * size) / 8, 0)
+    h.lineTo((i * size) / 8, size)
+    h.stroke()
+  }
+  rug = {
+    map: texture(albedo.el, THREE.SRGBColorSpace),
+    normalMap: normalFrom(height, 0.7),
+    roughnessMap: texture(albedo.el, THREE.NoColorSpace),
+  }
+  return rug
+}
+
+/** Low wood planter rail — quiet edge, no runway dashes. */
+export function railSurface(size = 128) {
+  if (rail) return rail
+  const albedo = canvas(size)
+  const height = canvas(size)
+  albedo.ctx.fillStyle = '#b08958'
+  albedo.ctx.fillRect(0, 0, size, size)
+  height.ctx.fillStyle = '#8a8a8a'
+  height.ctx.fillRect(0, 0, size, size)
+  albedo.ctx.fillStyle = 'rgba(70,48,28,0.18)'
+  albedo.ctx.fillRect(0, size * 0.42, size, 3)
+  rail = {
+    map: texture(albedo.el, THREE.SRGBColorSpace),
+    emissiveMap: texture(albedo.el, THREE.SRGBColorSpace),
+    normalMap: normalFrom(height, 0.6),
+  }
+  return rail
+}
+
 export function kerbSurface(size = 128) {
   if (kerb) return kerb
 

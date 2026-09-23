@@ -3,18 +3,16 @@ import { withCurve } from '../core/curve.js'
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 
 /**
- * The lander. Every astronaut walks out of its ramp when a thread appears and back up it
- * when one is archived, so it is the colony's one fixed piece of narrative furniture.
- *
- * The hull is merged into a single geometry; only the parts that actually move or glow —
- * the ramp, the beacon, the engine wash — stay separate.
+ * The glass lobby. People walk out of the doors when a thread appears and back in
+ * when one is archived — same door API the lander used to own.
  */
 
-const HULL = 0xf0ece4
-const HULL_DARK = 0xc4bfb4
-const TRIM = 0xc96442
-const METAL = 0x8f9299
-const GLASS = 0x7fc4e0
+const HULL = 0xf4efe6
+const HULL_DARK = 0xd8cfc2
+const TRIM = 0xc4a574
+const METAL = 0x9a9086
+const GLASS = 0xb7d4ea
+const FRAME = 0xe8ece8
 
 /** Roughness / metalness per material, so the hull reads as painted panel over bare strut. */
 const SURFACE = new Map([
@@ -22,7 +20,8 @@ const SURFACE = new Map([
   [HULL_DARK, [0.62, 0.08]],
   [TRIM, [0.45, 0.1]],
   [METAL, [0.26, 0.95]],
-  [GLASS, [0.06, 0]],
+  [GLASS, [0.08, 0.02]],
+  [FRAME, [0.42, 0.12]],
   [0x4a4d55, [0.35, 0.85]],
 ])
 const DEFAULT_SURFACE = [0.55, 0.15]
@@ -57,89 +56,32 @@ export class Ship {
       colors.push(new THREE.Color(color))
     }
 
-    // Main body — a squat capsule sitting up on its legs.
-    const body = new THREE.SphereGeometry(2.4, 22, 16)
-    body.scale(1, 0.86, 1)
-    body.translate(0, 3.5, 0)
-    push(body, HULL)
+    this.footRadius = 3.2
+    const w = 3.4
+    const d = 3.1
+    const h = 3.2
 
-    // Skirt under the belly, so the hull does not just stop in mid-air above the legs.
-    const skirt = new THREE.CylinderGeometry(1.75, 1.15, 1.1, 20)
-    skirt.translate(0, 1.5, 0)
-    push(skirt, HULL_DARK)
-
-    // Nose cap + sensor mast.
-    const nose = new THREE.SphereGeometry(1.0, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2)
-    nose.scale(1, 0.9, 1)
-    nose.translate(0, 5.42, 0)
-    push(nose, TRIM)
-    const mast = new THREE.CylinderGeometry(0.08, 0.11, 1.4, 6)
-    mast.translate(0, 6.0, 0)
-    push(mast, METAL)
-
-    // Porthole surrounds, on the widest band where a flat ring genuinely sits flush.
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 + 0.62
-      const ring = new THREE.TorusGeometry(0.4, 0.07, 6, 14)
-      ring.rotateY(-a + Math.PI / 2)
-      ring.translate(Math.cos(a) * 2.33, 3.7, Math.sin(a) * 2.33)
-      push(ring, HULL_DARK)
+    // Floor slab
+    push(new THREE.BoxGeometry(w + 0.4, 0.16, d + 0.4).translate(0, 0.08, 0), HULL)
+    // Roof
+    push(new THREE.BoxGeometry(w + 0.5, 0.14, d + 0.5).translate(0, h, 0), FRAME)
+    // Corner posts
+    for (const x of [-w / 2, w / 2]) {
+      for (const z of [-d / 2, d / 2]) {
+        push(new THREE.BoxGeometry(0.16, h, 0.16).translate(x, h / 2, z), FRAME)
+      }
     }
-
-    /**
-     * Legs. Every dimension is derived from where the foot has to land, so the strut, the
-     * footpad and the ground all agree — eyeballing the offsets separately is exactly how
-     * legs end up floating above a pad or buried under one.
-     */
-    const tilt = 0.46
-    const legLen = 2.9
-    const hipR = 1.55
-    const hipY = 2.75
-    const footR = hipR + Math.sin(tilt) * legLen
-    const footY = hipY - Math.cos(tilt) * legLen
-    this.footRadius = footR
-
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + Math.PI / 4
-      const leg = new THREE.CylinderGeometry(0.16, 0.21, legLen, 8)
-      leg.rotateZ(tilt)
-      leg.rotateY(-a)
-      leg.translate(Math.cos(a) * ((hipR + footR) / 2), (hipY + footY) / 2, Math.sin(a) * ((hipR + footR) / 2))
-      push(leg, METAL)
-
-      const pad = new THREE.CylinderGeometry(0.6, 0.46, 0.26, 12)
-      pad.translate(Math.cos(a) * footR, Math.max(0.13, footY), Math.sin(a) * footR)
-      push(pad, HULL_DARK)
-
-      // A brace from mid-leg back up into the skirt.
-      const braceR = (hipR + footR) * 0.36
-      const brace = new THREE.CylinderGeometry(0.06, 0.06, 1.7, 5)
-      brace.rotateZ(-0.95)
-      brace.rotateY(-a)
-      brace.translate(Math.cos(a) * (braceR + 0.5), 1.55, Math.sin(a) * (braceR + 0.5))
-      push(brace, METAL)
-    }
-
-    // Engine bell.
-    const bell = new THREE.CylinderGeometry(0.55, 1.05, 1.0, 14, 1, true)
-    bell.translate(0, 0.85, 0)
-    push(bell, 0x4a4d55)
-
-    /**
-     * The airlock. A short tube poking out of the hull rather than a flat ring laid on it —
-     * a torus can never sit flush against a sphere, and one that tries ends up as an arch
-     * with its bottom hanging in the air.
-     */
-    const collar = new THREE.CylinderGeometry(0.92, 0.92, 0.9, 16, 1, true)
-    collar.rotateX(Math.PI / 2)
-    collar.translate(0, 3.15, 2.25)
-    push(collar, HULL_DARK)
-    // Only the top two-thirds of the ring: a full torus leaves a bar hanging in the gap
-    // the ramp comes out of, which reads as a handle rather than as a hatch frame.
-    const lip = new THREE.TorusGeometry(0.92, 0.1, 6, 20, Math.PI * 1.34)
-    lip.rotateZ(-Math.PI * 0.17)
-    lip.translate(0, 3.15, 2.68)
-    push(lip, TRIM)
+    // Side lintels
+    push(new THREE.BoxGeometry(w, 0.14, 0.14).translate(0, h - 0.1, d / 2), FRAME)
+    push(new THREE.BoxGeometry(w, 0.14, 0.14).translate(0, h - 0.1, -d / 2), FRAME)
+    // Reception desk facing the doors
+    push(new THREE.BoxGeometry(1.6, 0.08, 0.55).translate(0, 0.92, -0.35), TRIM)
+    push(new THREE.BoxGeometry(1.45, 0.82, 0.48).translate(0, 0.45, -0.35), HULL_DARK)
+    // Planter
+    push(new THREE.CylinderGeometry(0.22, 0.26, 0.32, 10).translate(-1.15, 0.28, 0.85), 0xc47a5a)
+    push(new THREE.SphereGeometry(0.28, 8, 6).translate(-1.15, 0.62, 0.85), 0x4f8a4a)
+    // Sign band
+    push(new THREE.BoxGeometry(1.4, 0.22, 0.06).translate(0, 2.55, d / 2 + 0.08), TRIM)
 
     const merged = mergeWithColors(parts, colors)
     this.hull = new THREE.Mesh(merged, hullMaterial())
@@ -147,27 +89,38 @@ export class Ship {
     this.hull.receiveShadow = true
     this.group.add(this.hull)
 
-    // The dark hatch opening, set at the back of the collar so it reads as depth.
-    const opening = new THREE.Mesh(
-      new THREE.CircleGeometry(0.9, 20),
-      new THREE.MeshBasicMaterial({ color: 0x05060a, toneMapped: false })
-    )
-    opening.position.set(0, 3.15, 2.3)
-    this.group.add(opening)
-
-    const glassParts = []
-    const glassColors = []
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2 + 0.62
-      const pane = new THREE.CircleGeometry(0.36, 14)
-      pane.rotateY(-a + Math.PI / 2)
-      pane.translate(Math.cos(a) * 2.37, 3.7, Math.sin(a) * 2.37)
-      glassParts.push(pane)
-      glassColors.push(new THREE.Color(GLASS))
+    // Glass walls — opening on +Z for the doors
+    const glassMat = new THREE.MeshPhysicalMaterial({
+      color: GLASS,
+      transparent: true,
+      opacity: 0.28,
+      roughness: 0.08,
+      metalness: 0.05,
+      transmission: 0.45,
+      thickness: 0.2,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    })
+    const panes = [
+      [w, h - 0.3, 0.04, 0, h / 2, -d / 2],
+      [0.04, h - 0.3, d, -w / 2, h / 2, 0],
+      [0.04, h - 0.3, d, w / 2, h / 2, 0],
+    ]
+    this.glassMaterial = glassMat
+    this.glass = new THREE.Group()
+    for (const [gw, gh, gd, x, y, z] of panes) {
+      const pane = new THREE.Mesh(new THREE.BoxGeometry(gw, gh, gd), glassMat)
+      pane.position.set(x, y, z)
+      this.glass.add(pane)
     }
-    this.glassMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: true })
-    this.glass = new THREE.Mesh(mergeWithColors(glassParts, glassColors), this.glassMaterial)
     this.group.add(this.glass)
+
+    const opening = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.6, 2.2),
+      new THREE.MeshBasicMaterial({ color: 0x1a1c22, toneMapped: false, side: THREE.DoubleSide })
+    )
+    opening.position.set(0, 1.15, d / 2 - 0.12)
+    this.group.add(opening)
   }
 
   /**
@@ -175,84 +128,55 @@ export class Ship {
    * solved from those two points rather than set by hand, so it always meets both.
    */
   _buildRamp() {
-    const topY = 3.05
-    const topZ = 2.68
-    const footZ = 6.1
-    const drop = topY - 0.06
-    const run = footZ - topZ
-    const length = Math.hypot(run, drop)
-    const angle = Math.atan2(drop, run)
-
-    const geo = new THREE.BoxGeometry(1.8, 0.14, length)
-    geo.translate(0, 0, length / 2) // pivot at the hatch end
-    const mat = new THREE.MeshStandardMaterial({ color: HULL_DARK, roughness: 0.7, metalness: 0.15 })
-    this.ramp = new THREE.Mesh(geo, mat)
-    this.ramp.position.set(0, topY, topZ)
-    this.ramp.rotation.x = angle
+    const footZ = 4.4
+    const walk = new THREE.BoxGeometry(1.8, 0.1, 2.4)
+    walk.translate(0, 0.08, 2.7)
+    const mat = new THREE.MeshStandardMaterial({ color: HULL, roughness: 0.65, metalness: 0.04 })
+    this.ramp = new THREE.Mesh(walk, mat)
     this.ramp.castShadow = true
     this.ramp.receiveShadow = true
     this.group.add(this.ramp)
 
-    // Treads across it, and a lit strip down each edge.
-    const treads = []
-    const treadColors = []
-    const steps = Math.max(3, Math.round(length / 0.55))
-    for (let i = 1; i < steps; i++) {
-      const t = new THREE.BoxGeometry(1.6, 0.05, 0.09)
-      t.translate(0, 0.09, (length * i) / steps)
-      treads.push(t)
-      treadColors.push(new THREE.Color(0x8e8a80))
-    }
-    const treadMesh = new THREE.Mesh(mergeWithColors(treads, treadColors), hullMaterial())
-    this.ramp.add(treadMesh)
-
     const strips = []
     const stripColors = []
     for (const dx of [-0.82, 0.82]) {
-      const s = new THREE.BoxGeometry(0.1, 0.07, length - 0.15)
-      s.translate(dx, 0.09, length / 2)
+      const s = new THREE.BoxGeometry(0.08, 0.04, 2.2)
+      s.translate(dx, 0.14, 2.7)
       strips.push(s)
       stripColors.push(new THREE.Color(TRIM))
     }
     this.stripMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: true })
     this.strips = new THREE.Mesh(mergeWithColors(strips, stripColors), this.stripMaterial)
-    this.ramp.add(this.strips)
+    this.group.add(this.strips)
 
-    // Astronauts appear and vanish a step short of the ground, at the foot of the ramp —
-    // and on a first load they come out of the airlock at its top and walk down it.
-    this.doorLocal = new THREE.Vector3(0, 0, footZ + 0.6)
-    this.airlockLocal = new THREE.Vector3(0, topY + 0.02, topZ - 0.3)
+    this.doorLocal = new THREE.Vector3(0, 0, footZ + 0.4)
+    this.airlockLocal = new THREE.Vector3(0, 0.12, 1.35)
   }
 
   _buildLights() {
-    // Beacon on the mast.
-    this.beaconMaterial = new THREE.MeshBasicMaterial({ color: 0xff5a4a, toneMapped: true })
-    this.beacon = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 8), this.beaconMaterial)
-    this.beacon.position.set(0, 6.5, 0)
+    this.beaconMaterial = new THREE.MeshBasicMaterial({ color: 0xffe2b0, toneMapped: true })
+    this.beacon = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), this.beaconMaterial)
+    this.beacon.position.set(0, 3.05, 0)
     this.group.add(this.beacon)
 
-    // Landing lights ringing the pad.
     const pads = []
     const padColors = []
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2
-      const r = (this.footRadius || 3) + 1.5
-      const l = new THREE.SphereGeometry(0.12, 8, 6)
-      l.translate(Math.cos(a) * r, 0.12, Math.sin(a) * r)
+    for (const dx of [-1.1, 1.1]) {
+      const l = new THREE.SphereGeometry(0.08, 8, 6)
+      l.translate(dx, 2.15, 1.55)
       pads.push(l)
-      padColors.push(new THREE.Color(0x9fd8ff))
+      padColors.push(new THREE.Color(0xffe2b0))
     }
     this.padMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: true })
     this.padLights = new THREE.Mesh(mergeWithColors(pads, padColors), this.padMaterial)
     this.group.add(this.padLights)
 
-    // Scorched apron under the ship.
     const apron = new THREE.Mesh(
-      new THREE.CircleGeometry((this.footRadius || 3) + 2.3, 32),
-      new THREE.MeshStandardMaterial({ color: 0x2f2c2c, roughness: 1, transparent: true, opacity: 0.65 })
+      new THREE.CircleGeometry(4.2, 32),
+      new THREE.MeshStandardMaterial({ color: 0xd8cbb4, roughness: 0.85, transparent: true, opacity: 0.45 })
     )
     apron.rotation.x = -Math.PI / 2
-    apron.position.y = 0.05
+    apron.position.y = 0.04
     apron.receiveShadow = true
     this.group.add(apron)
   }
@@ -272,22 +196,17 @@ export class Ship {
     return out.copy(this.airlockLocal).applyMatrix4(this.group.matrixWorld)
   }
 
-  update(dt, elapsed, night) {
-    // Beacon: a double-blink, like a real aircraft strobe.
-    const t = elapsed % 2
-    const strobe = t < 0.08 || (t > 0.2 && t < 0.28) ? 1 : 0.08
-    this.beaconMaterial.color.setRGB(3.2 * strobe, 0.35 * strobe, 0.28 * strobe)
+  update(dt, elapsed, _night) {
+    const glow = 0.85 + 0.12 * Math.sin(elapsed * 1.4)
+    this.beaconMaterial.color.setRGB(1.15 * glow, 0.9 * glow, 0.62 * glow)
+    this.padMaterial.color.setRGB(1.05 * glow, 0.88 * glow, 0.62 * glow)
+    if (this.glassMaterial.color) this.glassMaterial.color.setRGB(0.72, 0.83, 0.9)
 
-    const gain = 0.35 + night * 2.2
-    this.padMaterial.color.setRGB(0.55 * gain, 0.82 * gain, 1.1 * gain)
-    this.glassMaterial.color.setRGB(0.5 * gain, 0.78 * gain, 0.92 * gain)
-
-    // Ramp strips brighten while anyone is walking on them.
     this.traffic = Math.max(0, this.traffic - dt * 1.5)
     const busy = Math.min(1, this.traffic)
-    const pulse = 0.6 + 0.4 * Math.sin(elapsed * 4)
-    const s = (0.5 + night * 1.2) * (1 + busy * pulse * 1.6)
-    this.stripMaterial.color.setRGB(1.0 * s, 0.45 * s, 0.3 * s)
+    const pulse = 0.75 + 0.25 * Math.sin(elapsed * 3)
+    const s = 0.85 * (1 + busy * pulse * 0.5)
+    this.stripMaterial.color.setRGB(0.85 * s, 0.7 * s, 0.48 * s)
   }
 
   /** Called when an astronaut uses the ramp, so the lights react. */

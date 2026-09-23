@@ -131,7 +131,7 @@ export class Colony {
     this.camera = camera
     this.renderer = renderer
 
-    this.planet = PLANETS[settings.get('planet')] || PLANETS.moon
+    this.planet = PLANETS[settings.get('planet')] || PLANETS.office || PLANETS.moon
     this._applyPlanetTint()
     this.sky = new Sky(scene, settings, renderer)
     this.sky.setPlanet(this.planet)
@@ -662,7 +662,7 @@ export class Colony {
       const cells = layout.get(name)
       if (!cells?.length) return
       const accent = this._pickAccent(name)
-      const plot = new Plot({ id: name, name, index, cells, accent })
+      const plot = new Plot({ id: name, name, index, cells, accent, style: this.planet.indoor ? 'office' : 'colony' })
       plot.signature = wanted.get(name)
       this.plots.set(name, plot)
       this.plotGroup.add(plot.group)
@@ -742,7 +742,7 @@ export class Colony {
     const target = 1
 
     if (!entry) {
-      const mesh = createBuilding({ seed: hashString(thread.id), accent: plot.accent })
+      const mesh = createBuilding({ seed: hashString(thread.id), accent: plot.accent, indoor: this.planet.indoor })
       const pos = plot.worldSlot(index)
       mesh.position.copy(pos)
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)

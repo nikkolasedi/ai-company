@@ -74,8 +74,8 @@ export function IsometricOffice({ departments, initialAgents }: IsometricOfficeP
             <h2 className="text-lg font-semibold sm:text-xl">Agent Colony</h2>
             <p className="text-xs text-zinc-400 sm:text-sm">
               {displayMode === "3d"
-                ? "Drag to look around. Click a person to see their work."
-                : "Tap a person to see their work"}
+                ? "Drag to look around. Click a person to see their desk."
+                : "Tap a person to see their desk"}
             </p>
           </div>
           <div className="flex flex-wrap items-end gap-2 sm:gap-3">

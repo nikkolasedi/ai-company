@@ -416,7 +416,8 @@ const ROTOR_SPIN = [1, -1.04, 1.08, -0.96]
  * hexagonal disc and two blades each, skids, a front LED, and a crate on a cable
  * underneath. The crate and cable are `aCrate` so the shader can fold them away.
  */
-function droneGeometry() {
+function droneGeometry(ground = false) {
+  if (ground) return cartGeometry()
   const parts = []
   const hull = new RoundedBoxGeometry(0.5, 0.2, 0.5, 3, 0.07)
   parts.push(tag(hull))
@@ -429,7 +430,6 @@ function droneGeometry() {
     const sx = i & 1 ? 1 : -1
     const sz = i & 2 ? 1 : -1
     const arm = new THREE.BoxGeometry(0.42, 0.035, 0.05)
-    // A box along X turned to point along (sx, sz).
     arm.rotateY(Math.atan2(-sz, sx))
     arm.translate(sx * 0.24, 0.06, sz * 0.24)
     parts.push(tag(arm, { aAccent: 1 }))
@@ -461,7 +461,6 @@ function droneGeometry() {
   led.translate(0, 0.02, 0.27)
   parts.push(tag(led, { aEmissive: 1 }))
 
-  // The collapse point is inside the hull, so a folded crate is out of sight.
   const fold = [0, -0.05, 0]
   const cable = new THREE.BoxGeometry(0.012, 0.36, 0.012)
   cable.translate(0, -0.28, 0)
@@ -470,6 +469,38 @@ function droneGeometry() {
   crate.translate(0, -0.61, 0)
   parts.push(tag(crate, { aCrate: 1, pivot: fold, aAccent: 2 }))
 
+  return merge(parts)
+}
+
+function cartGeometry() {
+  const parts = []
+  const body = new RoundedBoxGeometry(0.55, 0.22, 0.72, 2, 0.04)
+  body.translate(0, 0.22, 0)
+  parts.push(tag(body))
+  const tray = new THREE.BoxGeometry(0.48, 0.05, 0.42)
+  tray.translate(0, 0.36, -0.04)
+  parts.push(tag(tray, { aAccent: 1 }))
+  for (const [x, z] of [
+    [-0.2, 0.24],
+    [0.2, 0.24],
+    [-0.2, -0.24],
+    [0.2, -0.24],
+  ]) {
+    const wheel = new THREE.CylinderGeometry(0.08, 0.08, 0.05, 10)
+    wheel.rotateZ(Math.PI / 2)
+    wheel.translate(x, 0.08, z)
+    parts.push(tag(wheel, { aSpin: x > 0 ? 1 : -1, pivot: [x, 0.08, z], aAccent: 1 }))
+  }
+  const mast = new THREE.CylinderGeometry(0.02, 0.02, 0.28, 6)
+  mast.translate(0.18, 0.48, 0.22)
+  parts.push(tag(mast, { aAccent: 1 }))
+  const lamp = new THREE.SphereGeometry(0.04, 6, 4)
+  lamp.translate(0.18, 0.64, 0.22)
+  parts.push(tag(lamp, { aEmissive: 1 }))
+  const fold = [0, 0.36, 0]
+  const crate = new THREE.BoxGeometry(0.22, 0.18, 0.22)
+  crate.translate(0, 0.48, -0.06)
+  parts.push(tag(crate, { aCrate: 1, pivot: fold, aAccent: 2 }))
   return merge(parts)
 }
 
@@ -1045,8 +1076,11 @@ class Fleet {
     this.env = env
     this.rand = mulberry(seed)
     this.count = Math.max(0, Math.round(spec.count ?? 3))
+    this.grounded = Boolean(spec.ground)
+    this.parkHeight = this.grounded ? 0.16 : PARK_HEIGHT
+    this.cruiseClear = this.grounded ? 0.16 : CRUISE_CLEARANCE
 
-    const geo = droneGeometry()
+    const geo = droneGeometry(this.grounded)
     phaseAttribute(geo, this.count, this.rand)
     this.carry = new THREE.InstancedBufferAttribute(new Float32Array(this.count).fill(1), 1)
     this.carry.setUsage(THREE.DynamicDrawUsage)
@@ -1136,7 +1170,7 @@ class Fleet {
       if (d.state === 'parked' || d.state === 'land') {
         d.x = d.homeX
         d.z = d.homeZ
-        d.y = pad.y + PARK_HEIGHT
+        d.y = pad.y + this.parkHeight
         d.heading = a + Math.PI
         d.state = 'parked'
       }
@@ -1193,7 +1227,7 @@ class Fleet {
   }
 
   _cruiseY(x, z) {
-    return Math.max(this.env.heightAt(x, z), DECK) + CRUISE_CLEARANCE
+    return Math.max(this.env.heightAt(x, z), DECK) + this.cruiseClear
   }
 
   /**
@@ -1263,7 +1297,7 @@ class Fleet {
 
       switch (d.state) {
         case 'parked': {
-          wantY = this.pad.y + PARK_HEIGHT
+          wantY = this.pad.y + this.parkHeight
           wantThrottle = IDLE_THROTTLE
           d.timer -= dt
           if (d.timer <= 0) {
@@ -1279,7 +1313,7 @@ class Fleet {
         }
         case 'takeoff': {
           wantY = this._cruiseY(d.x, d.z)
-          if (d.y > wantY - 0.3) d.state = 'cruise'
+          if (this.grounded || d.y > wantY - 0.3) d.state = 'cruise'
           break
         }
         case 'cruise':
@@ -1313,7 +1347,9 @@ class Fleet {
           // at its own height, and holds its distance from the others, so a busy roof reads
           // as a queue rather than one drone drawn several times.
           const t = 1 - d.timer / d.hoverT
-          wantY = this._cruiseY(d.x, d.z) - 1 - Math.sin(t * Math.PI) * 0.6 + (i % 3) * 0.45
+          wantY = this.grounded
+            ? this._cruiseY(d.x, d.z)
+            : this._cruiseY(d.x, d.z) - 1 - Math.sin(t * Math.PI) * 0.6 + (i % 3) * 0.45
           const sep = this._separate(d, _sep)
           wantVX = sep.x
           wantVZ = sep.z
@@ -1326,7 +1362,7 @@ class Fleet {
           break
         }
         case 'land': {
-          wantY = this.pad.y + PARK_HEIGHT
+          wantY = this.pad.y + this.parkHeight
           if (d.y < wantY + 0.1) {
             d.state = 'parked'
             d.timer = 6 + this.rand() * 19
@@ -1359,8 +1395,9 @@ class Fleet {
       const forwardA = dt > 0 ? (ax * fx + az * fz) / dt : 0
       const sideV = d.vx * fz - d.vz * fx
       const sideA = dt > 0 ? (ax * fz - az * fx) / dt : 0
-      const pitch = THREE.MathUtils.clamp(forwardV * 0.045 + forwardA * 0.03, -0.35, 0.35)
-      const roll = THREE.MathUtils.clamp(sideV * 0.045 + sideA * 0.03, -0.35, 0.35)
+      const lean = this.grounded ? 0.012 : 0.045
+      const pitch = THREE.MathUtils.clamp(forwardV * lean + forwardA * 0.03, -0.35, 0.35)
+      const roll = THREE.MathUtils.clamp(sideV * lean + sideA * 0.03, -0.35, 0.35)
       d.pitch += (pitch - d.pitch) * Math.min(1, 4 * dt)
       d.roll += (roll - d.roll) * Math.min(1, 4 * dt)
 

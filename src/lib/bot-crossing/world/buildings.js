@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { mulberry } from './planet.js'
 import { ATLAS, CELL, atlasTexture, cellMask, part } from './kit.js'
+import { createOfficeBuilding } from './office-furniture.js'
 import { withCurve } from '../core/curve.js'
 
 /**
@@ -464,7 +465,10 @@ function depthMaterial(uniforms) {
  *
  * Requires `loadKit()` to have resolved — boot awaits it before the first roster arrives.
  */
-export function createBuilding({ seed = 1, accent = 0xc96442, kind = null } = {}) {
+export function createBuilding({ seed = 1, accent = 0xc96442, kind = null, indoor = true } = {}) {
+  if (indoor) {
+    return createOfficeBuilding({ seed, accent, kind })
+  }
   const rand = mulberry(seed)
   const chosen = kind && KINDS[kind] ? kind : KIND_IDS[Math.floor(rand() * KIND_IDS.length)]
 

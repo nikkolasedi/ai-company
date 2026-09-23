@@ -143,7 +143,7 @@ export function BotCrossingView({
   return (
     <div
       ref={containerRef}
-      className="bot-crossing-root absolute inset-0 overflow-hidden rounded-lg bg-[#0a0b0f]"
+      className="bot-crossing-root absolute inset-0 overflow-hidden rounded-lg bg-[#d8dce6]"
     />
   );
 }
